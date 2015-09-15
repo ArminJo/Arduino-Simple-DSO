@@ -12,14 +12,16 @@
 #ifndef FREQUENCYGENERATOR_H_
 #define FREQUENCYGENERATOR_H_
 
+#include "BDButton.h"
+
 #include <inttypes.h>
 #include <avr/pgmspace.h>
 
-void initFrequency(void);
-void initFrequencyPage(void);
-void drawFrequencyGui(void);
+void initFrequencyGenerator(void);
+void initFrequencyGeneratorPage(void);
+void drawFrequencyGeneratorPage(void);
 
-extern uint8_t TouchButtonFrequency;
+extern BDButton TouchButtonFrequencyPage;
 extern const char StringStop[] PROGMEM; // "Stop"
 
 #endif //FREQUENCYGENERATOR_H_
