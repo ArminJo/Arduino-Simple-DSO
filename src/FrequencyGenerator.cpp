@@ -15,7 +15,6 @@
 #include "SimpleTouchScreenDSO.h"
 
 #include "BlueDisplay.h"
-#include "EventHandler.h"
 
 #include <stdio.h>   // for printf
 #include <math.h>   // for pow and log10f
@@ -105,10 +104,10 @@ void initFrequencyGeneratorPage(void) {
     const uint16_t * tFrequencyPtr = &Frequency[0];
     for (uint8_t i = 0; i < NUMBER_OF_FIXED_FREQUENCY_BUTTONS; ++i) {
         tFrequency = pgm_read_word(tFrequencyPtr);
-        sprintf_P(StringBuffer, PSTR("%u"), tFrequency);
+        sprintf_P(sDataBuffer, PSTR("%u"), tFrequency);
         TouchButtonFirstFixedFrequency.init(tXPos,
-                DISPLAY_HEIGHT - BUTTON_HEIGHT_4 - BUTTON_HEIGHT_5 - BUTTON_HEIGHT_6 - 2 * BUTTON_DEFAULT_SPACING,
-                BUTTON_WIDTH_10, BUTTON_HEIGHT_6, COLOR_BLUE, StringBuffer, TEXT_SIZE_11, 0, tFrequency, &doSetFixedFrequency);
+                REMOTE_DISPLAY_HEIGHT - BUTTON_HEIGHT_4 - BUTTON_HEIGHT_5 - BUTTON_HEIGHT_6 - 2 * BUTTON_DEFAULT_SPACING,
+                BUTTON_WIDTH_10, BUTTON_HEIGHT_6, COLOR_BLUE, sDataBuffer, TEXT_SIZE_11, 0, tFrequency, &doSetFixedFrequency);
         tXPos += BUTTON_WIDTH_10 + BUTTON_DEFAULT_SPACING_QUARTER;
         tFrequencyPtr++;
     }
@@ -162,7 +161,7 @@ void drawFrequencyGeneratorPage(void) {
     TouchSliderFrequency.drawSlider();
     BlueDisplay1.drawTextPGM(TEXT_SIZE_11_WIDTH, FREQ_SLIDER_Y + 3 * FREQ_SLIDER_SIZE + TEXT_SIZE_11_HEIGHT, PSTR("1"),
     TEXT_SIZE_11, COLOR_BLUE, COLOR_BACKGROUND_FREQ);
-    BlueDisplay1.drawTextPGM(DISPLAY_WIDTH - 5 * TEXT_SIZE_11_WIDTH, FREQ_SLIDER_Y + 3 * FREQ_SLIDER_SIZE + TEXT_SIZE_11_HEIGHT,
+    BlueDisplay1.drawTextPGM(REMOTE_DISPLAY_WIDTH - 5 * TEXT_SIZE_11_WIDTH, FREQ_SLIDER_Y + 3 * FREQ_SLIDER_SIZE + TEXT_SIZE_11_HEIGHT,
             PSTR("1000"), TEXT_SIZE_11, COLOR_BLUE, COLOR_BACKGROUND_FREQ);
 
     // fixed frequency buttons
@@ -350,12 +349,12 @@ bool ComputePeriodAndSetTimer(bool aSetSlider) {
     if (tDividerInt < F_CPU / 2) {
         float tPeriod = tDividerInt;
         tPeriod /= 8;
-        dtostrf(tPeriod, 10, 3, &StringBuffer[20]);
-        sprintf_P(StringBuffer, PSTR("%s\xB5s"), &StringBuffer[20]); //micro seconds
+        dtostrf(tPeriod, 10, 3, &sDataBuffer[20]);
+        sprintf_P(sDataBuffer, PSTR("%s\xB5s"), &sDataBuffer[20]); //micro seconds
     } else {
-        sprintf_P(StringBuffer, PSTR("%10lums"), (tDividerInt / (F_CPU / 2000)));
+        sprintf_P(sDataBuffer, PSTR("%10lums"), (tDividerInt / (F_CPU / 2000)));
     }
-    BlueDisplay1.drawText(TEXT_SIZE_22_WIDTH, FONT_SIZE_INFO_SHORT + TEXT_SIZE_22_ASCEND + TEXT_SIZE_22_HEIGHT, StringBuffer, 16,
+    BlueDisplay1.drawText(TEXT_SIZE_22_WIDTH, FONT_SIZE_INFO_SHORT + TEXT_SIZE_22_ASCEND + TEXT_SIZE_22_HEIGHT, sDataBuffer, 16,
     COLOR_BLUE, COLOR_BACKGROUND_FREQ);
 
     // output frequency
@@ -366,10 +365,10 @@ bool ComputePeriodAndSetTimer(bool aSetSlider) {
     }
     sFrequency = tFrequency;
 
-    dtostrf(tFrequency, 9, 3, &StringBuffer[20]);
-    sprintf_P(StringBuffer, PSTR("%s%cHz"), &StringBuffer[20], FrequencyFactorChars[sFrequencyFactorIndex]);
+    dtostrf(tFrequency, 9, 3, &sDataBuffer[20]);
+    sprintf_P(sDataBuffer, PSTR("%s%cHz"), &sDataBuffer[20], FrequencyFactorChars[sFrequencyFactorIndex]);
     // just below DSO info line
-    BlueDisplay1.drawText(2 * TEXT_SIZE_22_WIDTH, FONT_SIZE_INFO_SHORT + TEXT_SIZE_22_ASCEND, StringBuffer, TEXT_SIZE_22, COLOR_RED,
+    BlueDisplay1.drawText(2 * TEXT_SIZE_22_WIDTH, FONT_SIZE_INFO_SHORT + TEXT_SIZE_22_ASCEND, sDataBuffer, TEXT_SIZE_22, COLOR_RED,
     COLOR_BACKGROUND_FREQ);
 
     sSliderValue = log10(tFrequency) * 100;

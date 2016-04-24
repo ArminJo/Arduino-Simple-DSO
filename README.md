@@ -9,7 +9,9 @@ The DSO needs only a standard Arduino-Uno or Arduino-Micro, a HC-05 Bluetooth mo
 - Full touch screen control of all parameters.
 - AC Measurement supported by using (passive) external attenuator circuit (see below).
 - Automatic trigger level, range and offset selection.
-- Manual trigger level and range select possible.
+- Manual trigger level and range select.
+- Trigger delay.
+- External trigger.
 - 1120 Byte data buffer - 3.5 times display size.
 - Display of min, max, average and peak to peak values.
 - Display of period and frequency.
@@ -20,6 +22,8 @@ The DSO needs only a standard Arduino-Uno or Arduino-Micro, a HC-05 Bluetooth mo
 - Using 1.1 Volt internal reference. 5 Volt (VCC) also selectable which is useful if no attenuator is attached.
 
 - Code serves also as an example of C++/Assembler coding and a non trivial interrupt handling routine.
+
+- Included as example in the [BlueDisplay library for Arduino](https://github.com/ArminJo/android-blue-display/tree/master/arduino/libraries/BlueDisplay/BlueDisplay.zip).
 
 # DOCUMENTATION
 
@@ -40,7 +44,7 @@ On second line
 - Frequency
 
 ## TOUCH
-Short touch switches info output, long touch shows active GUI elements
+Short touch switches info output, long touch shows active GUI elements.
 
 #SCHEMATIC for passive attenuator
 ```
@@ -79,3 +83,10 @@ configured by connecting pin 10 to ground
                          33 uF
 
 ```
+DSO with passive attenuator on breadboard
+![DSO with passive attenuator on breadboard](https://github.com/ArminJo/android-blue-display/blob/gh-pages/pictures/ArduinoDSO.jpg)
+DSO settings menu
+![DSO settings menu](https://github.com/ArminJo/android-blue-display/blob/gh-pages/screenshots/DSOSettings.png)
+DSO frequency generator menu
+![Frequency generator menu](https://github.com/ArminJo/android-blue-display/blob/gh-pages/screenshots/Frequency.png)
+
