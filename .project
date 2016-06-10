@@ -26,16 +26,4 @@
 		<nature>de.innot.avreclipse.core.avrnature</nature>
 		<nature>org.eclipse.linuxtools.rpm.rpmlint.rpmlintNature</nature>
 	</natures>
-	<linkedResources>
-		<link>
-			<name>src/lib/BlueDisplay</name>
-			<type>2</type>
-			<location>WORKSPACE_LOC/lib/BlueDisplay</location>
-		</link>
-		<link>
-			<name>src/lib/digitalWriteFast</name>
-			<type>2</type>
-			<location>WORKSPACE_LOC/lib/digitalWriteFast</location>
-		</link>
-	</linkedResources>
 </projectDescription>

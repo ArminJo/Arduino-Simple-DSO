@@ -83,7 +83,7 @@
  * 6    AC / DC relais
  * 7    AC / DC relais
  * 8    Attenuator detect input with internal pullup - bit 0
- * 9    Attenuator detect input with internal pullup - bit 1  11-> no attenuator attached, 10-> simple (channel 0-2) attenuator attached, 11-> active (channel 0-1) attenuator attached
+ * 9    Attenuator detect input with internal pullup - bit 1  11-> no attenuator attached, 10-> simple (channel 0-2) attenuator attached, 0x-> active (channel 0-1) attenuator attached
  * 10   Timer1 16 bit - Frequency generator output
  * 11   Timer2  8 bit - Square wave for VEE (-5V) generation
  * 13
@@ -391,6 +391,7 @@ bool changeRange(int8_t aChangeAmount);
 bool checkRAWValuesForClippingAndChangeRange(void);
 void computeAutoRange(void);
 void computeAutoOffset(void);
+void resetOffset(void);
 void setOffsetAutomatic(bool aNewState);
 
 // Attenuator support stuff
@@ -467,6 +468,11 @@ void setChannel(uint8_t aChannel, bool doGui);
 inline void setPrescaleFactor(uint8_t aFactor);
 void setReference(uint8_t aReference);
 void initTimer2(void);
+
+// Stack info
+void initStackFreeMeasurement(void);
+uint16_t getStackFreeMinimumBytes(void);
+void printFreeStack(void);
 
 /*******************************************************************************************
  * Program code starts here
@@ -604,6 +610,7 @@ void setup() {
     setVCCValue();
     BlueDisplay1.playFeedbackTone(false);
 
+    initStackFreeMeasurement();
 }
 
 /************************************************************************
@@ -1363,18 +1370,7 @@ void setInputRange(uint8_t aShiftValue, uint8_t aActiveAttenuatorValue) {
     if (MeasurementControl.ChannelHasActiveAttenuator) {
         setAttenuator(aActiveAttenuatorValue);
     }
-    if (MeasurementControl.ChannelIsACMode) {
-        // Adjust zero offset for small display ranges
-        uint16_t tNewValueOffsetForACMode = MeasurementControl.RawDSOReadingACZero / 2 + MeasurementControl.RawDSOReadingACZero / 4;
-        if (aShiftValue == 1) {
-            tNewValueOffsetForACMode = MeasurementControl.RawDSOReadingACZero / 2;
-        } else if (aShiftValue == 2) {
-            tNewValueOffsetForACMode = 0;
-        }
-        MeasurementControl.OffsetValue = tNewValueOffsetForACMode;
-    } else if (!MeasurementControl.OffsetAutomatic) {
-        MeasurementControl.OffsetValue = 0;
-    }
+    resetOffset();
 
     if (MeasurementControl.isRunning) {
         clearHorizontalGridLinesAndHorizontalLineLabels();
@@ -1552,16 +1548,21 @@ void computeAutoOffset(void) {
         if (tNumberOfGridLinesToSkip < 0) {
             tNumberOfGridLinesToSkip = 0;
         }
-        // avoid jitter by not changing number if its delta is only 1
-        if (abs(MeasurementControl.OffsetGridCount - tNumberOfGridLinesToSkip) > 1 || tNumberOfGridLinesToSkip == 0) {
+        if (abs(MeasurementControl.OffsetGridCount - tNumberOfGridLinesToSkip) > 1) {
+            // avoid jitter by not changing number if its delta is only 1
+            clearHorizontalGridLinesAndHorizontalLineLabels();
             MeasurementControl.OffsetValue = tNumberOfGridLinesToSkip * tRawValuePerGrid;
             MeasurementControl.OffsetGridCount = tNumberOfGridLinesToSkip;
+            drawGridLinesWithHorizLabelsAndTriggerLine();
+        } else if (tNumberOfGridLinesToSkip == 0) {
+            MeasurementControl.OffsetValue = 0;
+            MeasurementControl.OffsetGridCount = 0;
         }
     }
 }
 
 /*
- * returns false if auto offset could not be enabled because of ac mode
+ * sets offset and button caption
  */
 void setOffsetAutomatic(bool aNewState) {
     if (!aNewState) {
@@ -1570,6 +1571,24 @@ void setOffsetAutomatic(bool aNewState) {
     }
     MeasurementControl.OffsetAutomatic = aNewState;
     setAutoOffsetButtonCaption();
+}
+
+/*
+ * sets offset to right value for AC or DC mode
+ */
+void resetOffset(void) {
+    if (MeasurementControl.ChannelIsACMode) {
+        // Adjust zero offset for small display ranges
+        uint16_t tNewValueOffsetForACMode = MeasurementControl.RawDSOReadingACZero / 2 + MeasurementControl.RawDSOReadingACZero / 4;
+        if (MeasurementControl.ShiftValue == 1) {
+            tNewValueOffsetForACMode = MeasurementControl.RawDSOReadingACZero / 2;
+        } else if (MeasurementControl.ShiftValue == 2) {
+            tNewValueOffsetForACMode = 0;
+        }
+        MeasurementControl.OffsetValue = tNewValueOffsetForACMode;
+    } else if (!MeasurementControl.OffsetAutomatic) {
+        MeasurementControl.OffsetValue = 0;
+    }
 }
 
 /***********************************************************************
@@ -1613,9 +1632,11 @@ void setACMode(bool aNewMode) {
     if (MeasurementControl.isRunning) {
         drawGridLinesWithHorizLabelsAndTriggerLine();
     }
-    // Wait for latching relay to switch - 1ms is working - (2 does not work reliable after reset so take 4)
+    resetOffset();
+
+    // Wait for latching relay to switch - 2ms does not work reliable after reset, so take 4ms.
     delay(4);
-    // No need for power any more
+    // No need for relay power any more
     digitalWriteFast(tRelaisPin, LOW);
 }
 
@@ -1795,6 +1816,9 @@ void drawDSOSettingsPageGui(void) {
     TouchButtonADCReference.drawButton();
     TouchButtonChartHistoryOnOff.drawButton();
     TouchButtonFrequencyPage.drawButton();
+    // print minimum stacksize and enable new stack measurement
+    printFreeStack();
+    initStackFreeMeasurement();
 }
 
 /*
@@ -2830,14 +2854,71 @@ void printVCCAndTemperature(void) {
         dtostrf(tTemp, 4, 1, &sDataBuffer[40]);
         sprintf_P(sDataBuffer, PSTR("%s Volt %s\xB0" "C"), &sDataBuffer[30], &sDataBuffer[40]);
         BlueDisplay1.drawText(BUTTON_WIDTH_3_POS_2, BUTTON_HEIGHT_4_256_LINE_4 - (TEXT_SIZE_11_DECEND + 3), sDataBuffer,
-        TEXT_SIZE_11,
-        COLOR_BLACK, COLOR_BACKGROUND_DSO);
+        TEXT_SIZE_11, COLOR_BLACK, COLOR_BACKGROUND_DSO);
     }
 }
 
 /************************************************************************
  * Utility section
  ************************************************************************/
+
+/*
+ * initialize RAM between actual stack and actual heap start (__brkval) with pattern 0x5A
+ */
+void initStackFreeMeasurement(void) {
+    extern unsigned int __heap_start;
+    extern void * __brkval;
+    uint8_t v;
+
+    uint8_t * tHeapPtr = (uint8_t *) __brkval;
+    if (tHeapPtr == 0) {
+        tHeapPtr = (uint8_t *) &__heap_start;
+    }
+
+    // Fill memory
+    do {
+        *tHeapPtr++ = 0x5A;
+    } while (tHeapPtr < &v);
+}
+
+/*
+ * Check for untouched patterns
+ */
+uint16_t getStackFreeMinimumBytes(void) {
+    extern unsigned int __heap_start;
+    extern void * __brkval;
+    uint8_t v;
+
+    uint8_t * tHeapPtr = (uint8_t *) __brkval;
+    if (tHeapPtr == 0) {
+        tHeapPtr = (uint8_t *) &__heap_start;
+    }
+
+    // first search for first match, because malloc() and free() may be happened in between
+    while (*tHeapPtr != 0x5A && tHeapPtr < &v) {
+        tHeapPtr++;
+    }
+    // then count untouched patterns
+    uint16_t tStackFree = 0;
+    while (*tHeapPtr == 0x5A && tHeapPtr < &v) {
+        tHeapPtr++;
+        tStackFree++;
+    }
+    // word -> bytes
+    return (tStackFree);
+}
+
+/*
+ * Show minimum free space on stack
+ * Needs 260 byte of FLASH
+ */
+void printFreeStack(void) {
+    uint16_t tUntouchesBytesOnStack = getStackFreeMinimumBytes();
+    sprintf_P(sDataBuffer, PSTR("%4u Bytes stack"), tUntouchesBytesOnStack);
+    BlueDisplay1.drawText(0, BUTTON_HEIGHT_4_256_LINE_4 - (TEXT_SIZE_11_DECEND + 3), sDataBuffer,
+    TEXT_SIZE_11, COLOR_BLACK, COLOR_BACKGROUND_DSO);
+}
+
 bool changeTimeBaseValue(int8_t aChangeValue, bool doOutput) {
     bool IsError = false;
     uint8_t tOldIndex = MeasurementControl.TimebaseIndex;
@@ -2999,8 +3080,11 @@ void computeMicrosPerPeriod(void) {
 uint8_t getDisplayFromRawValue(uint16_t aRawValue) {
     aRawValue -= MeasurementControl.OffsetValue;
     aRawValue >>= MeasurementControl.ShiftValue;
-    aRawValue = DISPLAY_VALUE_FOR_ZERO - aRawValue;
-    return aRawValue;
+    if (DISPLAY_VALUE_FOR_ZERO > aRawValue) {
+        return (DISPLAY_VALUE_FOR_ZERO - aRawValue);
+    } else {
+        return 0;
+    }
 }
 
 uint16_t getRawFromDisplayValue(uint8_t aDisplayValue) {

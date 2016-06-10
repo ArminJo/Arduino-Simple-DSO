@@ -16,10 +16,12 @@ The DSO needs only a standard Arduino-Uno or Arduino-Micro, a HC-05 Bluetooth mo
 - Display of min, max, average and peak to peak values.
 - Display of period and frequency.
 - 3 different types of external attenuator detected by software.
-  - no attenuator.
-  - passive attenuator with /1, /10, /100 attenuation.
-  - active attenuator.
+  - no attenuator (pin 8+9 left open).
+  - passive attenuator with /1, /10, /100 attenuation (pin 8 connected to ground).
+  - active attenuator (pin 9 connected to ground).
 - Using 1.1 Volt internal reference. 5 Volt (VCC) also selectable which is useful if no attenuator is attached.
+
+- Integrated frequency generator using 16 bit Timer1. Frequency from 119 mHz (8.388 second) to 8MHz
 
 - Code serves also as an example of C++/Assembler coding and a non trivial interrupt handling routine.
 
