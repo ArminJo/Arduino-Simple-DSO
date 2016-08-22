@@ -75,6 +75,12 @@ typedef uint16_t Color_t; // is needed in EventHandler.h
 #define GET_BLUE(rgb) ((rgb & 0x001F) << 3)
 #define RGB(r,g,b)   ((Color_t)(((r&0xF8)<<8)|((g&0xFC)<<3)|((b&0xF8)>>3))) //5 red | 6 green | 5 blue
 
+
+#define SLIDER_DEFAULT_BORDER_COLOR     COLOR_BLUE
+#define SLIDER_DEFAULT_BAR_COLOR        COLOR_GREEN
+#define SLIDER_DEFAULT_BACKGROUND_COLOR COLOR_WHITE
+#define SLIDER_DEFAULT_THRESHOLD_COLOR  COLOR_RED
+
 /*
  * Android Text sizes which are closest to the 8*12 font used locally
  */

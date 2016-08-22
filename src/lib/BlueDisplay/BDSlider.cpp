@@ -56,7 +56,7 @@ BDSlider::BDSlider(BDSliderHandle_t aSliderHandle, TouchSlider * aLocalSliderPoi
  * @param aSliderColor - Color of slider border. If no border specified, then bar background color.
  * @param aBarColor
  * @param aOptions - See #FLAG_SLIDER_SHOW_BORDER etc.
- * @param aOnChangeHandler - If NULL no update of bar is done on touch
+ * @param aOnChangeHandler - If NULL no update of bar is done on touch - equivalent to FLAG_SLIDER_IS_ONLY_OUTPUT
  */
 void BDSlider::init(uint16_t aPositionX, uint16_t aPositionY, uint16_t aBarWidth, int16_t aBarLength, int16_t aThresholdValue,
         int16_t aInitalValue, Color_t aSliderColor, Color_t aBarColor, uint8_t aFlags,

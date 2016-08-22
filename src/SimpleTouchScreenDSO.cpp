@@ -29,22 +29,21 @@
  */
 
 /*
- * SIMPLE EXTERNAL ATTENUATOR CIRCUIT (configured by connecting pin 10 to ground)
+ * SIMPLE EXTERNAL ATTENUATOR CIRCUIT (configured by connecting pin 8 to ground)
  *
- * Safety circuit and AC/DC switch
- * 3 resistors   2 diodes   1 capacitor   1 switch
+ * Attenuator circuit and AC/DC switch
  *
- *                ADC INPUT_0  1.1 Volt         ADC INPUT_1 11 Volt        ADC INPUT_2 110 Volt
- *                      /\                         /\     ______              /\     ______
- *                      |                          +-----| 220k |----+        +-----| 10 k |----------+
- *                      |      ______              |      ______     |        |      ------           |
- *                      +-----| >4 M |----+        +-----| 220k |----+        |      _____            |
- *                      |      ------     |        |      ------     |        +-----| 5 M |-+ 2*5 M or|
- *                      _                 |        _                 |        _      -----  _ 3*3.3 M |
- *                     | |                |       | |                |       | |           | |        |
- *                     | | 10 k           |       | | 1 M            |       | | 1 M       | | 5 M    |
- *                     | |                |       | |                |       | |           | |        |
- *                      -                 |        -                 |        -             -         |
+ *          D2    ADC INPUT_0  1.1 Volt         ADC INPUT_1 11 Volt        ADC INPUT_2 110 Volt
+ *          /\          /\                         /\     ______              /\     ______
+ *          |           |                          +-----| 220k |----+        +-----| 10 k |----------+
+ *          _           |      ______              |      ______     |        |      ------           |
+ *         | |          +-----| >4 M |----+        +-----| 220k |----+        |      _____            |
+ *         | | 100 k    |      ------     |        |      ------     |        +-----| 5 M |-+ 2*5 M or|
+ *         | |          _                 |        _                 |        _      -----  _ 3*3.3 M |
+ *          -          | |                |       | |                |       | |           | |        |
+ *          |          | | 10 k           |       | | 1 M            |       | | 1 M       | | 5 M    |
+ *          O          | |                |       | |                |       | |           | |        |
+ *   External_Trigger   -                 |        -                 |        -             -         |
  *                      |                 |        |                 |        |             |         |
  *                      +----+            |        +----+            |        +----+        +----+    |
  *                      |    |            |        |    |            |        |    |        |    |    |
@@ -52,18 +51,18 @@
  *                      |    |            |        |    |            |        |    |        |    |    |
  *                      O    O            |        O    O            |        O    O        O    O    |
  *                     DC   AC            |       DC   AC            |       DC   AC       DC   AC    |
- *                                        |                          |                     1000 V Range for mains
- *                       +----------------+--------------------------+--------------------------------+
- *                       |
- *                       O
- *           AC/DC      /
- *           Switch    /
- *                   O/    O----------+
- *                AC |     DC         |
- *         ______    |       ______   |
- *   VREF-| 100k |---+------| 100k |--+
- *         ------    |       ------   |
- *                   +--------||------+-GND
+ *          D3                            |                          |                     1000 V Range for mains
+ *          /\           +----------------+--------------------------+--------------------------------+
+ *          |            |
+ *          O            O
+ *         / _________  /   AC/DC            D8/Mode       D10/Frequency generator
+ *        /            /    Switch             /\             \/
+ *      O/    O      O/    O----------+        |              |
+ *     GND    DC  AC |     DC         |        |              |
+ *         ______    |       ______   |        |              |
+ *   VREF-| 100k |---+------| 100k |--+        |              \/
+ *         ------    |       ------   |        |
+ *                   +--------||------+-GND----+
  *                          33 uF
  *
  */
@@ -77,11 +76,11 @@
 /*
  * PIN
  * 2    External trigger input
- * 3    AC / DC (for attenuator)
- * 4    Attenuator range control
- * 5    Attenuator range control
- * 6    AC / DC relais
- * 7    AC / DC relais
+ * 3    AC (low)/ DC (for attenuator)
+ * 4    Attenuator range control (for active attenuator)
+ * 5    Attenuator range control (for active attenuator)
+ * 6    AC / DC relais (for active attenuator)
+ * 7    AC / DC relais (for active attenuator)
  * 8    Attenuator detect input with internal pullup - bit 0
  * 9    Attenuator detect input with internal pullup - bit 1  11-> no attenuator attached, 10-> simple (channel 0-2) attenuator attached, 0x-> active (channel 0-1) attenuator attached
  * 10   Timer1 16 bit - Frequency generator output
@@ -3267,6 +3266,9 @@ void setReference(uint8_t aReference) {
     ADMUX = (ADMUX & ~0xC0) | (aReference << REFS0);
 }
 
+/*
+ * Square wave for VEE (-5V) generation
+ */
 void initTimer2(void) {
 
 // initialization with 0 is essential otherwise timer will not work correctly!!!

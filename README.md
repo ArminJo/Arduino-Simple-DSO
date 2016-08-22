@@ -50,38 +50,38 @@ Short touch switches info output, long touch shows active GUI elements.
 
 #SCHEMATIC for passive attenuator
 ```
-configured by connecting pin 10 to ground
+configured by connecting pin 8 to ground
 
-               ADC INPUT_0  1.1 Volt         ADC INPUT_1 11 Volt        ADC INPUT_2 11 Volt
-                     /\                         /\                         /\
-                     |                          |      _____               |
-                     |      _____               o-----|_____|-----o        |      _____
-                     o-----|_____|-----o        o-----|_____|-----o        o-----|_____|-----o
-                     |      >4 M       |        |     2x 220k     |        |      10 k       |
-                     _                 |        _                 |        _                 |
-                    | |                |       | |                |       | |                |
-                    | | 10 k           |       | | 1 M            |       | | 1 M            |
-                    |_|                |       |_|                |       |_|                |
-                     |                 |        |                 |        |                 |
-                     |                 |        |                 |        |                 |
-                     o----o            |        o----o            |        o----o            |
-                     |    |            |        |    |            |        |    |            |
-                     |    = C 0.1uF    |        |    = C 0.1uF    |        |    = C 0.1uF    |
-                     |    |            |        |    |            |        |    |            |
-                     O    O            |        O    O            |        O    O            |
-                    DC   AC            |       DC   AC            |       DC   AC            |
-                                       |                          |                          |
-                      o----------------o--------------------------o--------------------------o
-                      |
-                      O
-          AC/DC      /
-          Switch    /
-                  O/    O----------o
-               AC |     DC         |
-                  |       _____    |
-  VREF-| 100k |---o------|_____|---o
-                  |       100k     |
-                  o--------||------o-GND
+          D2    ADC INPUT_0  1.1 Volt         ADC INPUT_1 11 Volt        ADC INPUT_2 110 Volt
+          /\          /\                         /\     ______              /\     ______
+          |           |                          +-----| 220k |----+        +-----| 10 k |----------+
+          _           |      ______              |      ______     |        |      ------           |
+         | |          +-----| >4 M |----+        +-----| 220k |----+        |      _____            |
+         | | 100 k    |      ------     |        |      ------     |        +-----| 5 M |-+ 2*5 M or|
+         | |          _                 |        _                 |        _      -----  _ 3*3.3 M |
+          -          | |                |       | |                |       | |           | |        |
+          |          | | 10 k           |       | | 1 M            |       | | 1 M       | | 5 M    |
+          O          | |                |       | |                |       | |           | |        |
+   External_Trigger   -                 |        -                 |        -             -         |
+                      |                 |        |                 |        |             |         |
+                      +----+            |        +----+            |        +----+        +----+    |
+                      |    |            |        |    |            |        |    |        |    |    |
+                      |    = C 0.1uF    |        |    = C 0.1uF    |        |    = 0.1uF  |    = 0.1uF  400 Volt
+                      |    |            |        |    |            |        |    |        |    |    |
+                      O    O            |        O    O            |        O    O        O    O    |
+                     DC   AC            |       DC   AC            |       DC   AC       DC   AC    |
+         D3                            |                          |                     1000 V Range for mains
+         /\           +----------------+--------------------------+--------------------------------+
+         |            |
+         O            O
+        / _________  /   AC/DC            D8/Mode       D10/Frequency generator
+       /            /    Switch             /\             \/
+     O/    O      O/    O----------+        |              |
+    GND    DC  AC |     DC         |        |              |
+        ______    |       ______   |        |              |
+  VREF-| 100k |---+------| 100k |--+        |              \/
+        ------    |       ------   |        |
+                  +--------||------+-GND----+
                          33 uF
 
 ```
