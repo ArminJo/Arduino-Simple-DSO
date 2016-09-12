@@ -48,6 +48,19 @@ On second line
 ## TOUCH
 Short touch switches info output, long touch shows active GUI elements.
 
+#SCHEMATIC
+Schematic
+![Fritzing schematic](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Schaltplan.png)
+Breadboard schematic
+![Fritzing breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Steckplatine.png)
+DSO with passive attenuator on breadboard
+![DSO with passive attenuator on breadboard](https://github.com/ArminJo/android-blue-display/blob/gh-pages/pictures/ArduinoDSO.jpg)
+#SCREENSHOTS
+DSO settings menu
+![DSO settings menu](https://github.com/ArminJo/android-blue-display/blob/gh-pages/screenshots/DSOSettings.png)
+DSO frequency generator menu
+![Frequency generator menu](https://github.com/ArminJo/android-blue-display/blob/gh-pages/screenshots/Frequency.png)
+
 #SCHEMATIC for passive attenuator
 ```
 configured by connecting pin 8 to ground
@@ -70,14 +83,14 @@ configured by connecting pin 8 to ground
                       |    |            |        |    |            |        |    |        |    |    |
                       O    O            |        O    O            |        O    O        O    O    |
                      DC   AC            |       DC   AC            |       DC   AC       DC   AC    |
-         D3                            |                          |                     1000 V Range for mains
+         D3                            |                          |                     1000 V Range
          /\           +----------------+--------------------------+--------------------------------+
          |            |
          O            O
         / _________  /   AC/DC            D8/Mode       D10/Frequency generator
        /            /    Switch             /\             \/
-     O/    O      O/    O----------+        |              |
-    GND    DC  AC |     DC         |        |              |
+GND--O/    O      O/    O----------+        |              |
+     AC    DC  AC |     DC         |        |              |
         ______    |       ______   |        |              |
   VREF-| 100k |---+------| 100k |--+        |              \/
         ------    |       ------   |        |
@@ -85,10 +98,4 @@ configured by connecting pin 8 to ground
                          33 uF
 
 ```
-DSO with passive attenuator on breadboard
-![DSO with passive attenuator on breadboard](https://github.com/ArminJo/android-blue-display/blob/gh-pages/pictures/ArduinoDSO.jpg)
-DSO settings menu
-![DSO settings menu](https://github.com/ArminJo/android-blue-display/blob/gh-pages/screenshots/DSOSettings.png)
-DSO frequency generator menu
-![Frequency generator menu](https://github.com/ArminJo/android-blue-display/blob/gh-pages/screenshots/Frequency.png)
 

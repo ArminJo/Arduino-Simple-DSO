@@ -101,6 +101,7 @@ void BlueDisplay::initCommunication(void (*aConnectCallback)(void), void (*aReor
 
 /*
  * simple version since reorientation and reconnect callback functions are sometimes the same
+ * Waits for 300ms for connection to be established -> bool BlueDisplay1.mConnectionEstablished
  */
 void BlueDisplay::initCommunication(void (*aConnectAndReorientationCallback)(void), void (*aRedrawCallback)(void)) {
     registerConnectCallback(aConnectAndReorientationCallback);
@@ -371,9 +372,11 @@ uint16_t BlueDisplay::drawChar(uint16_t aPosX, uint16_t aPosY, char aChar, uint1
 }
 
 /**
- * @param aXStart left position
- * @param aYStart upper position
+ * @param aPosX left position
+ * @param aPosY baseline position - use (upper_position + getTextAscend(<aTextSize>))
  * @param aStringPtr  If /r is used as newline character, rest of line will be cleared, if /n is used, rest of line will not be cleared.
+ * @param aTextSize FontSize of text
+ * @param aFGColor Foreground/text color
  * @param aBGColor if COLOR_NO_BACKGROUND, then the background will not filled
  * @return uint16_t start x for next character - next x Parameter
  */
@@ -411,14 +414,15 @@ uint16_t BlueDisplay::drawByte(uint16_t aPosX, uint16_t aPosY, int8_t aByte, uin
     }
     return tRetValue;
 }
+
 uint16_t BlueDisplay::drawUnsignedByte(uint16_t aPosX, uint16_t aPosY, uint8_t aUnsignedByte, uint16_t aTextSize, Color_t aFGColor,
         Color_t aBGColor) {
     uint16_t tRetValue = 0;
     char tStringBuffer[4];
 #ifdef AVR
-    sprintf_P(tStringBuffer, PSTR("%3hhd"), aUnsignedByte);
+    sprintf_P(tStringBuffer, PSTR("%3u"), aUnsignedByte);
 #else
-    sprintf(tStringBuffer, "%3hhd", aUnsignedByte);
+    sprintf(tStringBuffer, "%3u", aUnsignedByte);
 #endif
 #ifdef LOCAL_DISPLAY_EXISTS
     tRetValue = LocalDisplay.drawText(aPosX, aPosY - getTextAscend(aTextSize), tStringBuffer, getLocalTextSize(aTextSize), aFGColor,
@@ -477,7 +481,7 @@ uint16_t BlueDisplay::drawLong(uint16_t aPosX, uint16_t aPosY, int32_t aLong, ui
  * for printf implementation
  */
 void BlueDisplay::setPrintfSizeAndColorAndFlag(uint16_t aPrintSize, Color_t aPrintColor, Color_t aPrintBackgroundColor,
-bool aClearOnNewScreen) {
+        bool aClearOnNewScreen) {
 #ifdef LOCAL_DISPLAY_EXISTS
     printSetOptions(getLocalTextSize(aPrintSize), aPrintColor, aPrintBackgroundColor, aClearOnNewScreen);
 #endif
@@ -832,7 +836,7 @@ void BlueDisplay::getNumberWithShortPromptPGM(void (*aNumberHandler)(float), con
         union {
             float floatValue;
             uint16_t shortArray[2];
-        }floatToShortArray;
+        } floatToShortArray;
         floatToShortArray.floatValue = aInitialValue;
         sendUSARTArgsAndByteBuffer(FUNCTION_GET_NUMBER_WITH_SHORT_PROMPT, 3, aNumberHandler, floatToShortArray.shortArray[0],
                 floatToShortArray.shortArray[1], tShortPromptLength, (uint8_t*) StringBuffer);
@@ -1147,6 +1151,86 @@ void BlueDisplay::deactivateAllSliders(void) {
         sendUSARTArgs(FUNCTION_SLIDER_DEACTIVATE_ALL, 0);
     }
 }
+
+/***************************************************************************************************************************************************
+ *
+ * Utilities
+ *
+ **************************************************************************************************************************************************/
+
+#ifdef AVR
+#include <Arduino.h>
+
+/***************************************
+ * ADC Section for VCC and temperature
+ ***************************************/
+#define PRESCALE128  7
+#define ADC_TEMPERATURE_CHANNEL 8
+#define ADC_1_1_VOLT_CHANNEL 0x0E
+/*
+ * take 64 samples with prescaler 128 from channel
+ * This takes 13 ms (+ 10 ms optional delay)
+ */
+uint16_t getADCValue(uint8_t aChannel, uint8_t aReference) {
+    uint8_t tOldADMUX = ADMUX;
+    ADMUX = aChannel | (aReference << REFS0);
+// Temperature channel also seem to need an initial delay
+    delay(10);
+    uint16_t tValue = 0;
+    uint16_t tSum = 0; // uint16_t is sufficient for 64 samples
+    uint8_t tOldADCSRA = ADCSRA;
+    ADCSRA = (1 << ADEN) | (1 << ADSC) | (1 << ADATE) | (1 << ADIF) | (0 << ADIE) | PRESCALE128;
+    for (int i = 0; i < 64; ++i) {
+        // wait for free running conversion to finish
+        while (bit_is_clear(ADCSRA, ADIF)) {
+            ;
+        }
+        tValue = ADCL;
+        tValue |= ADCH << 8;
+        tSum += tValue;
+    }
+    ADCSRA = tOldADCSRA;
+    ADMUX = tOldADMUX;
+
+    tSum = (tSum + 32) >> 6;
+    return tSum;
+}
+
+float getVCCValue(void) {
+    // use AVCC with external capacitor at AREF pin as reference
+    float tVCC = getADCValue(ADC_1_1_VOLT_CHANNEL, DEFAULT);
+    return ((1024 * 1.1) / tVCC);
+}
+
+float getTemperature(void) {
+    // use internal 1.1 Volt as reference
+    float tTemp = (getADCValue(ADC_TEMPERATURE_CHANNEL, INTERNAL) - 317);
+    return (tTemp / 1.22);
+}
+
+/*
+ * Show temperature and VCC voltage
+ */
+void BlueDisplay::printVCCAndTemperaturePeriodically(uint16_t aXPos, uint16_t aYPos, uint8_t aTextSize, uint16_t aPeriodMillis) {
+    static uint32_t sMillisOfLastVCCInfo = 0;
+    uint32_t tMillis = millis();
+
+    if ((tMillis - sMillisOfLastVCCInfo) >= aPeriodMillis) {
+        sMillisOfLastVCCInfo = tMillis;
+
+        char tDataBuffer[18];
+        char tVCCString[6];
+        char tTempString[6];
+
+        float tVCCVoltage = getVCCValue();
+        dtostrf(tVCCVoltage, 4, 2, tVCCString);
+        float tTemp = getTemperature();
+        dtostrf(tTemp, 4, 1, tTempString);
+        sprintf(tDataBuffer, "%s Volt %s\xB0" "C", tVCCString, tTempString);
+        drawText(aXPos, aYPos, tDataBuffer, aTextSize, COLOR_BLACK, COLOR_WHITE);
+    }
+}
+#endif
 
 /***************************************************************************************************************************************************
  *
