@@ -11,7 +11,10 @@
  *      Full touch screen control of all parameters.
  *      150/300 kSamples per second
  *      Supports AC Measurement with (passive) external attenuator circuit.
- *      3 external circuits detected by software - no attenuator, passive attenuator /1, /10, /100, active attenuator.
+ *      3 different types of external attenuator detected by software.
+ *        - no attenuator (pin 8+9 left open).
+ *        - passive attenuator with /1, /10, /100 attenuation (pin 8 connected to ground).
+ *        - active attenuator (pin 9 connected to ground).
  *      Automatic trigger, range and offset value selection
  *      External as well as delayed trigger possible
  *      1120 Byte data buffer - 3.5 * display width
@@ -314,8 +317,8 @@ union Myword {
  *   Loop control
  ***********************/
 // last sample of millis() in loop as reference for loop duration
-uint32_t MillisLastLoop = 0;
-uint32_t MillisSinceLastInfoOutput = 0;
+uint32_t sMillisLastLoop = 0;
+uint16_t sMillisSinceLastInfoOutput = 0;
 #define MILLIS_BETWEEN_INFO_OUTPUT 1000
 
 bool sShowWelcomeOnce;
@@ -623,11 +626,11 @@ void __attribute__((noreturn)) loop(void) {
     for (;;) {
         if (BlueDisplay1.mConnectionEstablished) {
             tMillis = millis();
-            tMillisOfLoop = tMillis - MillisLastLoop;
-            MillisLastLoop = tMillis;
-            MillisSinceLastInfoOutput += tMillisOfLoop;
-            if (MillisSinceLastInfoOutput > MILLIS_BETWEEN_INFO_OUTPUT) {
-                MillisSinceLastInfoOutput = 0;
+            tMillisOfLoop = tMillis - sMillisLastLoop;
+            sMillisLastLoop = tMillis;
+            sMillisSinceLastInfoOutput += tMillisOfLoop;
+            if (sMillisSinceLastInfoOutput > MILLIS_BETWEEN_INFO_OUTPUT) {
+                sMillisSinceLastInfoOutput = 0;
                 tOutputInfo = true;
             }
 
@@ -2095,9 +2098,9 @@ void doADCReference(BDButton * aTheTouchedButton, int16_t aValue) {
  */
 void doChannelSelect(BDButton * aTheTouchedButton, int16_t aValue) {
     if (aValue > 20) {
-        // channel increment button here
+        // channel increment button here "Ch 3" etc.
         uint8_t tOldValue = MeasurementControl.ADCInputMUXChannel;
-        // increment channel but only if channel 3 is still selected
+        // if channel 3 is not selected increment channel, otherwise select channel 3
         if (tOldValue >= NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR) {
             aValue = tOldValue + 1;
         } else {
@@ -2144,7 +2147,7 @@ void doTriggerSingleshot(BDButton * aTheTouchedButton, int16_t aValue) {
     COLOR_BLACK, COLOR_INFO_BACKGROUND);
 
 // prepare info output - at least 1 sec later
-    MillisSinceLastInfoOutput = 0;
+    sMillisSinceLastInfoOutput = 0;
     MeasurementControl.RawValueMax = 0;
     MeasurementControl.RawValueMin = 0;
 
@@ -2345,7 +2348,7 @@ void setChannelButtonsCaption(void) {
                     (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS));
         } else {
             ChannelSelectButtonString[CHANNEL_STRING_INDEX] = 0x30 + i;
-            TouchButtonChannels[i].setCaptionPGM(ChannelSelectButtonString, (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS));
+            TouchButtonChannels[i].setCaption(ChannelSelectButtonString, (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS));
         }
     }
 }
@@ -3183,6 +3186,7 @@ void setChannel(uint8_t aChannel, bool doGUI) {
     }
     MeasurementControl.ChannelIsACMode = tIsACMode;
     MeasurementControl.ChannelHasACDCSwitch = tHasACDC;
+    MeasurementControl.ADCReference = tReference;
     ADMUX = aChannel | (tReference << REFS0);
 
 //the second parameter for active attenuator is only needed if ChannelHasActiveAttenuator == true

@@ -55,47 +55,17 @@ Breadboard schematic
 ![Fritzing breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Steckplatine.png)
 DSO with passive attenuator on breadboard
 ![DSO with passive attenuator on breadboard](https://github.com/ArminJo/android-blue-display/blob/gh-pages/pictures/ArduinoDSO.jpg)
+
 #SCREENSHOTS
 DSO settings menu
 ![DSO settings menu](https://github.com/ArminJo/android-blue-display/blob/gh-pages/screenshots/DSOSettings.png)
 DSO frequency generator menu
 ![Frequency generator menu](https://github.com/ArminJo/android-blue-display/blob/gh-pages/screenshots/Frequency.png)
 
-#SCHEMATIC for passive attenuator
-```
-configured by connecting pin 8 to ground
-
-          D2    ADC INPUT_0  1.1 Volt         ADC INPUT_1 11 Volt        ADC INPUT_2 110 Volt
-          /\          /\                         /\     ______              /\     ______
-          |           |                          +-----| 220k |----+        +-----| 10 k |----------+
-          _           |      ______              |      ______     |        |      ------           |
-         | |          +-----| >4 M |----+        +-----| 220k |----+        |      _____            |
-         | | 100 k    |      ------     |        |      ------     |        +-----| 5 M |-+ 2*5 M or|
-         | |          _                 |        _                 |        _      -----  _ 3*3.3 M |
-          -          | |                |       | |                |       | |           | |        |
-          |          | | 10 k           |       | | 1 M            |       | | 1 M       | | 5 M    |
-          O          | |                |       | |                |       | |           | |        |
-   External_Trigger   -                 |        -                 |        -             -         |
-                      |                 |        |                 |        |             |         |
-                      +----+            |        +----+            |        +----+        +----+    |
-                      |    |            |        |    |            |        |    |        |    |    |
-                      |    = C 0.1uF    |        |    = C 0.1uF    |        |    = 0.1uF  |    = 0.1uF  400 Volt
-                      |    |            |        |    |            |        |    |        |    |    |
-                      O    O            |        O    O            |        O    O        O    O    |
-                     DC   AC            |       DC   AC            |       DC   AC       DC   AC    |
-         D3                            |                          |                     1000 V Range
-         /\           +----------------+--------------------------+--------------------------------+
-         |            |
-         O            O
-        / _________  /   AC/DC            D8/Mode       D10/Frequency generator
-       /            /    Switch             /\             \/
-GND--O/    O      O/    O----------+        |              |
-     AC    DC  AC |     DC         |        |              |
-        ______    |       ______   |        |              |
-  VREF-| 100k |---+------| 100k |--+        |              \/
-        ------    |       ------   |        |
-                  +--------||------+-GND----+
-                         33 uF
-
-```
-
+#SIMPLE VERSION
+Simple Schematic
+![Fritzing schematic](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Simple_Schaltplan.png)
+Simple Breadboard schematic
+![Fritzing breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Simple_Steckplatine.png)
+Simple DSO with no attenuator on breadboard
+![DSO with passive attenuator on breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/media/ArduinoDSO_Simple.jpg)

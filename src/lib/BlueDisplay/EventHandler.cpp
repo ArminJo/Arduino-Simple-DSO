@@ -134,6 +134,7 @@ void registerSensorChangeCallback(uint8_t aSensorType, uint8_t aSensorRate, uint
 
 /*
  * Delay, which also checks for events
+ * Is not affected by overflow of millis()!
  */
 void delayMillisWithCheckAndHandleEvents(unsigned long aTimeMillis) {
     unsigned long tStartMillis = millis();

@@ -328,10 +328,10 @@ void BDButton::initPGM(uint16_t aPositionX, uint16_t aPositionY, uint16_t aWidth
     if (USART_isBluetoothPaired()) {
         uint8_t tCaptionLength = strlen_P(aPGMCaption);
         if (tCaptionLength < STRING_BUFFER_STACK_SIZE) {
-            char StringBuffer[STRING_BUFFER_STACK_SIZE];
-            strcpy_P(StringBuffer, aPGMCaption);
+            char tStringBuffer[STRING_BUFFER_STACK_SIZE];
+            strcpy_P(tStringBuffer, aPGMCaption);
             sendUSARTArgsAndByteBuffer(FUNCTION_BUTTON_CREATE, 10, tButtonNumber, aPositionX, aPositionY, aWidthX, aHeightY,
-                    aButtonColor, aCaptionSize, aFlags, aValue, aOnTouchHandler, tCaptionLength, StringBuffer);
+                    aButtonColor, aCaptionSize, aFlags, aValue, aOnTouchHandler, tCaptionLength, tStringBuffer);
         }
     }
     mButtonHandle = tButtonNumber;
@@ -341,9 +341,9 @@ void BDButton::setCaptionPGM(const char * aPGMCaption) {
     if (USART_isBluetoothPaired()) {
         uint8_t tCaptionLength = strlen_P(aPGMCaption);
         if (tCaptionLength < STRING_BUFFER_STACK_SIZE) {
-            char StringBuffer[STRING_BUFFER_STACK_SIZE];
-            strcpy_P(StringBuffer, aPGMCaption);
-            sendUSARTArgsAndByteBuffer(FUNCTION_BUTTON_SET_CAPTION, 1, mButtonHandle, tCaptionLength, StringBuffer);
+            char tStringBuffer[STRING_BUFFER_STACK_SIZE];
+            strcpy_P(tStringBuffer, aPGMCaption);
+            sendUSARTArgsAndByteBuffer(FUNCTION_BUTTON_SET_CAPTION, 1, mButtonHandle, tCaptionLength, tStringBuffer);
         }
     }
 }
@@ -352,13 +352,13 @@ void BDButton::setCaptionPGM(const char * aPGMCaption, bool doDrawButton) {
     if (USART_isBluetoothPaired()) {
         uint8_t tCaptionLength = strlen_P(aPGMCaption);
         if (tCaptionLength < STRING_BUFFER_STACK_SIZE) {
-            char StringBuffer[STRING_BUFFER_STACK_SIZE];
-            strcpy_P(StringBuffer, aPGMCaption);
+            char tStringBuffer[STRING_BUFFER_STACK_SIZE];
+            strcpy_P(tStringBuffer, aPGMCaption);
             uint8_t tFunctionCode = FUNCTION_BUTTON_SET_CAPTION;
             if (doDrawButton) {
                 tFunctionCode = FUNCTION_BUTTON_SET_CAPTION_AND_DRAW_BUTTON;
             }
-            sendUSARTArgsAndByteBuffer(tFunctionCode, 1, mButtonHandle, tCaptionLength, StringBuffer);
+            sendUSARTArgsAndByteBuffer(tFunctionCode, 1, mButtonHandle, tCaptionLength, tStringBuffer);
         }
     }
 }
