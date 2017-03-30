@@ -18,7 +18,7 @@
 						<toolChain id="de.innot.avreclipse.toolchain.winavr.app.debug.812956350" name="AVR-GCC Toolchain" superClass="de.innot.avreclipse.toolchain.winavr.app.debug">
 							<option id="de.innot.avreclipse.toolchain.options.toolchain.objcopy.flash.app.debug.166226200" name="Generate HEX file for Flash memory" superClass="de.innot.avreclipse.toolchain.options.toolchain.objcopy.flash.app.debug" useByScannerDiscovery="false" value="true" valueType="boolean"/>
 							<option id="de.innot.avreclipse.toolchain.options.toolchain.objcopy.eeprom.app.debug.1026698418" name="Generate HEX file for EEPROM" superClass="de.innot.avreclipse.toolchain.options.toolchain.objcopy.eeprom.app.debug" useByScannerDiscovery="false"/>
-							<option id="de.innot.avreclipse.toolchain.options.toolchain.objdump.app.debug.197274098" name="Generate Extended Listing (Source + generated Assembler)" superClass="de.innot.avreclipse.toolchain.options.toolchain.objdump.app.debug" useByScannerDiscovery="false"/>
+							<option id="de.innot.avreclipse.toolchain.options.toolchain.objdump.app.debug.197274098" name="Generate Extended Listing (Source + generated Assembler)" superClass="de.innot.avreclipse.toolchain.options.toolchain.objdump.app.debug" useByScannerDiscovery="false" value="true" valueType="boolean"/>
 							<option id="de.innot.avreclipse.toolchain.options.toolchain.size.app.debug.2093835183" name="Print Size" superClass="de.innot.avreclipse.toolchain.options.toolchain.size.app.debug" useByScannerDiscovery="false"/>
 							<option id="de.innot.avreclipse.toolchain.options.toolchain.avrdude.app.debug.2034743120" name="AVRDude" superClass="de.innot.avreclipse.toolchain.options.toolchain.avrdude.app.debug" useByScannerDiscovery="false"/>
 							<targetPlatform id="de.innot.avreclipse.targetplatform.winavr.app.debug.9583452" name="AVR Cross-Target" superClass="de.innot.avreclipse.targetplatform.winavr.app.debug"/>
@@ -28,7 +28,7 @@
 								<inputType id="de.innot.avreclipse.tool.assembler.input.305914606" superClass="de.innot.avreclipse.tool.assembler.input"/>
 							</tool>
 							<tool id="de.innot.avreclipse.tool.compiler.winavr.app.debug.750514386" name="AVR Compiler" superClass="de.innot.avreclipse.tool.compiler.winavr.app.debug">
-								<option id="de.innot.avreclipse.compiler.option.debug.level.12385545" name="Generate Debugging Info" superClass="de.innot.avreclipse.compiler.option.debug.level" useByScannerDiscovery="false"/>
+								<option id="de.innot.avreclipse.compiler.option.debug.level.12385545" name="Generate Debugging Info" superClass="de.innot.avreclipse.compiler.option.debug.level" useByScannerDiscovery="false" value="de.innot.avreclipse.compiler.option.debug.level.g3" valueType="enumerated"/>
 								<option id="de.innot.avreclipse.compiler.option.optimize.88129897" name="Optimization Level" superClass="de.innot.avreclipse.compiler.option.optimize" useByScannerDiscovery="false"/>
 								<inputType id="de.innot.avreclipse.compiler.winavr.input.1692333020" name="C Source Files" superClass="de.innot.avreclipse.compiler.winavr.input"/>
 							</tool>
@@ -39,7 +39,7 @@
 									<listOptionValue builtIn="false" value="/Elektro/arduino/hardware/arduino/avr/cores/arduino"/>
 									<listOptionValue builtIn="false" value="/Elektro/arduino/hardware/arduino/avr/variants/standard"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/SimpleTouchScreenDSO_BlueDisplay/src/lib/BlueDisplay}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/SimpleTouchScreenDSO_BlueDisplay/src/lib/digitalWriteFast}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/SimpleTouchScreenDSO_BlueDisplay/src/lib}&quot;"/>
 								</option>
 								<option id="de.innot.avreclipse.cppcompiler.option.optimize.other.553758201" name="Other Optimization Flags" superClass="de.innot.avreclipse.cppcompiler.option.optimize.other" useByScannerDiscovery="false" value="-flto -mcall-prologues" valueType="string"/>
 								<inputType id="de.innot.avreclipse.cppcompiler.input.1705245366" superClass="de.innot.avreclipse.cppcompiler.input"/>
@@ -65,6 +65,11 @@
 							<tool id="de.innot.avreclipse.tool.avrdude.app.debug.1182111075" name="AVRDude" superClass="de.innot.avreclipse.tool.avrdude.app.debug"/>
 						</toolChain>
 					</folderInfo>
+					<fileInfo id="de.innot.avreclipse.configuration.app.debug.961549999.1669332948" name="TouchDSOCommon.h" rcbsApplicability="disable" resourcePath="src/TouchDSOCommon.h" toolsToInvoke=""/>
+					<fileInfo id="de.innot.avreclipse.configuration.app.debug.961549999.1871109592" name="BlueDisplay.h" rcbsApplicability="disable" resourcePath="src/lib/BlueDisplay/BlueDisplay.h" toolsToInvoke=""/>
+					<sourceEntries>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+					</sourceEntries>
 				</configuration>
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
@@ -74,7 +79,11 @@
 		<project id="SimpleTouchScreenDSO_BlueDisplay.de.innot.avreclipse.project.winavr.elf_2.1.0.95857129" name="AVR Cross Target Application" projectType="de.innot.avreclipse.project.winavr.elf_2.1.0"/>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
-	<storageModule moduleId="refreshScope"/>
+	<storageModule moduleId="refreshScope" versionNumber="2">
+		<configuration configurationName="Nano">
+			<resource resourceType="PROJECT" workspacePath="/SimpleTouchScreenDSO_BlueDisplay"/>
+		</configuration>
+	</storageModule>
 	<storageModule moduleId="scannerConfiguration">
 		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		<scannerConfigBuildInfo instanceId="de.innot.avreclipse.configuration.app.release.830848813;de.innot.avreclipse.configuration.app.release.830848813.;de.innot.avreclipse.tool.compiler.winavr.app.release.268970168;de.innot.avreclipse.compiler.winavr.input.657699022">

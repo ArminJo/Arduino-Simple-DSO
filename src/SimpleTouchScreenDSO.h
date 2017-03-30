@@ -12,7 +12,15 @@
 #ifndef SIMPLETOUCHSCREENDSO_H_
 #define SIMPLETOUCHSCREENDSO_H_
 
-#include "BDButton.h"
+#include "TouchDSOCommon.h"
+
+void doDefaultBackButton(BDButton * aTheTouchedButton, int16_t aValue);
+// Utility section
+bool changeTimeBaseValue(int8_t aChangeValue, bool doOutput);
+uint8_t getDisplayFromRawValue(uint16_t aRawValue);
+uint16_t getRawFromDisplayValue(uint8_t aDisplayValue);
+float getFloatFromDisplayValue(uint8_t aDisplayValue);
+extern "C" void INT0_vect();
 
 /*
  * Change this if you have reprogrammed the hc05 module for other baud rate
@@ -26,6 +34,11 @@ const unsigned int REMOTE_DISPLAY_HEIGHT = 256;
 const unsigned int REMOTE_DISPLAY_WIDTH = 320;
 
 #define THOUSANDS_SEPARATOR '.'
+
+// Data buffer size (must be small enough to leave appr. 7 % (144 Byte) for stack
+#define DATABUFFER_SIZE (3*REMOTE_DISPLAY_WIDTH) //960
+// Acquisition start values
+#define TIMEBASE_INDEX_START_VALUE 7 // 2ms - shows 50 Hz
 
 /*
  * Pins on port D
@@ -72,7 +85,7 @@ const unsigned int REMOTE_DISPLAY_WIDTH = 320;
 #define COLOR_TRIGGER_SLIDER RGB(0xFF,0XF0,0xFF)
 #define COLOR_MAX_MIN_LINE 0X0200 // light green
 #define COLOR_HOR_REF_LINE_LABEL COLOR_BLUE
-#define COLOR_TIMING_LINES RGB(0x00,0x98,0x00)
+#define COLOR_GRID_LINES RGB(0x00,0x98,0x00)
 
 // GUI element colors
 #define COLOR_GUI_CONTROL RGB(0xE8,0x00,0x00)
@@ -107,14 +120,6 @@ const unsigned int REMOTE_DISPLAY_WIDTH = 320;
 #define TRIGGER_LEVEL_INFO_SHORT_Y  (FONT_SIZE_INFO_SHORT + FONT_SIZE_INFO_SHORT_ASC)
 #define TRIGGER_LEVEL_INFO_LONG_Y   FONT_SIZE_INFO_LONG_ASC
 
-/*
- * Trigger values
- */
-#define TRIGGER_MODE_AUTO 0
-#define TRIGGER_MODE_MANUAL 1
-#define TRIGGER_MODE_FREE 2 // waits at least 23 ms (255 samples) for trigger
-#define TRIGGER_MODE_EXTERN 3
-
 // No trigger wait timeout for modes != TRIGGER_DELAY_NONE
 #define TRIGGER_DELAY_NONE 0
 #define TRIGGER_DELAY_MICROS 1
@@ -133,112 +138,149 @@ const unsigned int REMOTE_DISPLAY_WIDTH = 320;
 /*
  * External attenuator values
  */
-#define ATTENUATOR_TYPE_NO_ATTENUATOR 0
-#define ATTENUATOR_TYPE_FIXED_ATTENUATOR 1  // assume manual AC/DC switch
+#define ATTENUATOR_TYPE_NO_ATTENUATOR 0     // No attenuator at all. Start with aRef = VCC
+#define ATTENUATOR_TYPE_FIXED_ATTENUATOR 1  // Fixed attenuator at Channel0,1,2 assume manual AC/DC switch
 #define NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR 3 // Channel0 = /1, Ch1= /10, Ch2= /100
 
-#define ATTENUATOR_TYPE_ACTIVE_ATTENUATOR 2 // and 3
+#define ATTENUATOR_TYPE_ACTIVE_ATTENUATOR 2 // to be developed
 #define NUMBER_OF_CHANNEL_WITH_ACTIVE_ATTENUATOR 2
 
 #define MAX_ADC_CHANNEL 5
 
 struct MeasurementControlStruct {
-	// State
-	bool isRunning;
-	bool StopRequested;
-	// Used to disable trigger timeout and to specify full buffer read with stop after first read.
-	bool isSingleShotMode;
+    // State
+    bool isRunning;
+    bool StopRequested;
+    // Used to disable trigger timeout and to specify full buffer read with stop after first read.
+    bool isSingleShotMode;
 
-	float VCC; // Volt of VCC
-	uint8_t ADCReference; // DEFAULT = 1 =VCC   INTERNAL = 3 = 1.1V
+    float VCC; // Volt of VCC
+    uint8_t ADCReference; // DEFAULT = 1 =VCC   INTERNAL = 3 = 1.1V
 
-	// Input select
-	uint8_t ADCInputMUXChannel;
-	char ADCInputMUXChannelChar;
-	uint8_t AttenuatorType; //ATTENUATOR_TYPE_NO_ATTENUATOR, ATTENUATOR_TYPE_SIMPLE_ATTENUATOR, ATTENUATOR_TYPE_ACTIVE_ATTENUATOR
-	bool ChannelHasActiveAttenuator;
-	bool ChannelHasACDCSwitch; // has AC / DC switch - only for channels with active or passive attenuators
-	bool ChannelIsACMode; // AC Mode for actual channel
-	bool isACMode; // user AC mode setting
-	volatile uint8_t ACModeFromISR; // 0 -> DC, 1 -> AC, 2 -> request was processed
-	uint16_t RawDSOReadingACZero;
+    // Input select
+    uint8_t ADCInputMUXChannel;
+    char ADCInputMUXChannelChar;
+    uint8_t AttenuatorType; //ATTENUATOR_TYPE_NO_ATTENUATOR, ATTENUATOR_TYPE_SIMPLE_ATTENUATOR, ATTENUATOR_TYPE_ACTIVE_ATTENUATOR
+    bool ChannelHasActiveAttenuator;
+    bool ChannelHasACDCSwitch; // has AC / DC switch - only for channels with active or passive attenuators
+    bool ChannelIsACMode; // AC Mode for actual channel
+    bool isACMode; // user AC mode setting
+    volatile uint8_t ACModeFromISR; // 0 -> DC, 1 -> AC, 2 -> request was processed
+    uint16_t RawDSOReadingACZero;
 
-	// Trigger
-	bool TriggerSlopeRising;
-	uint16_t RawTriggerLevel;
-	uint16_t TriggerLevelUpper;
-	uint16_t TriggerLevelLower;
-	uint16_t ValueBeforeTrigger;
+    // Trigger
+    bool TriggerSlopeRising;
+    uint16_t RawTriggerLevel;
+    uint16_t RawTriggerLevelHysteresis; // The RawTriggerLevel +/- hysteresis depending on slope (- for TriggerSlopeRising) - Used for computeMicrosPerPeriod()
+    uint16_t RawHysteresis;
+    uint16_t ValueBeforeTrigger;
 
-	uint32_t TriggerDelayMillisEnd; // value of millis() at end of milliseconds trigger delay
-	uint16_t TriggerDelayMillisOrMicros;
-	uint8_t TriggerDelay; //  TRIGGER_DELAY_NONE 0, TRIGGER_DELAY_MICROS 1, TRIGGER_DELAY_MILLIS 2
+    uint32_t TriggerDelayMillisEnd; // value of millis() at end of milliseconds trigger delay
+    uint16_t TriggerDelayMillisOrMicros;
+    uint8_t TriggerDelay; //  TRIGGER_DELAY_NONE 0, TRIGGER_DELAY_MICROS 1, TRIGGER_DELAY_MILLIS 2. Threshold is  __UINT16_MAX__
 
-	// Using type TriggerMode instead of uint8_t increases program size by 76 bytes
-	uint8_t TriggerMode; // adjust values automatically
-	bool OffsetAutomatic; // false -> offset = 0 Volt
-	uint8_t TriggerStatus; //TRIGGER_STATUS_START 0, TRIGGER_STATUS_BEFORE_THRESHOLD 1, TRIGGER_STATUS_OK 2
-	uint8_t TriggerSampleCountPrecaler; // for dividing sample count by 256 - to avoid 32bit variables in ISR
-	uint16_t TriggerSampleCountDividedBy256; // for trigger timeout
-	uint16_t TriggerTimeoutSampleCount; // ISR max samples before trigger timeout
+    // Using type TriggerMode instead of uint8_t increases program size by 76 bytes
+    uint8_t TriggerMode; // adjust values automatically
+    bool OffsetAutomatic; // false -> offset = 0 Volt
+    uint8_t TriggerStatus; //TRIGGER_STATUS_START 0, TRIGGER_STATUS_BEFORE_THRESHOLD 1, TRIGGER_STATUS_OK 2
+    uint8_t TriggerSampleCountPrecaler; // for dividing sample count by 256 - to avoid 32bit variables in ISR
+    uint16_t TriggerSampleCountDividedBy256; // for trigger timeout
+    uint16_t TriggerTimeoutSampleCount; // ISR max samples before trigger timeout. Used only for trigger modes with timeout.
 
-	// Statistics (for info and auto trigger)
-	uint16_t RawValueMin;
-	uint16_t RawValueMax;
-	uint16_t ValueMinForISR;
-	uint16_t ValueMaxForISR;
-	uint16_t ValueAverage;
-	uint32_t IntegrateValueForAverage;
-	uint32_t PeriodMicros;
+    // Statistics (for info and auto trigger)
+    uint16_t RawValueMin;
+    uint16_t RawValueMax;
+    uint16_t ValueMinForISR;
+    uint16_t ValueMaxForISR;
+    uint16_t ValueAverage;
+    uint32_t IntegrateValueForAverage;
+    uint32_t PeriodMicros;
+    uint32_t PeriodFirst; // Length of first pulse or pause
+    uint32_t PeriodSecond; // Length of second pulse or pause
+    uint32_t FrequencyHertz;
 
-	// Timebase
-	bool TimebaseFastFreerunningMode;
-	uint8_t TimebaseIndex;
-	uint8_t TimebaseHWValue;
-	// volatile saves 2 registers push in ISR
-	// delay loop duration - 1/4 micros resolution
-	volatile uint16_t TimebaseDelay;
-	// remaining micros for long delays - 1/4 micros resolution
-	uint16_t TimebaseDelayRemaining;
+    // Timebase
+    bool TimebaseFastFreerunningMode;
+    uint8_t TimebaseIndex;
+    uint8_t TimebaseHWValue;
+    // volatile saves 2 registers push in ISR
+    // delay loop duration - 1/4 micros resolution
+    volatile uint16_t TimebaseDelay;
+    // remaining micros for long delays - 1/4 micros resolution
+    uint16_t TimebaseDelayRemaining;
 
-	bool RangeAutomatic; // RANGE_MODE_AUTOMATIC, MANUAL
+    bool RangeAutomatic; // RANGE_MODE_AUTOMATIC, MANUAL
 
-	// Shift and scale
-	uint16_t OffsetValue;
-	uint8_t AttenuatorValue; // 0 for direct input or channels without attenuator, 1 -> factor 10, 2 -> factor 100, 3 -> input shortcut
-	uint8_t ShiftValue; // shift (division) value  (0-2) for different voltage ranges
-	uint16_t HorizontalGridSizeShift8; // depends on shift  for 5V reference 0,02 -> 41 other -> 51.2
-	float HorizontalGridVoltage; // voltage per grid for offset etc.
-	int8_t OffsetGridCount; // number of bottom line for offset != 0 Volt.
-	uint32_t TimestampLastRangeChange;
+    // Shift and scale
+    uint16_t OffsetValue;
+    uint8_t AttenuatorValue; // 0 for direct input or channels without attenuator, 1 -> factor 10, 2 -> factor 100, 3 -> input shortcut
+    uint8_t ShiftValue; // shift (division) value  (0-2) for different voltage ranges
+    uint16_t HorizontalGridSizeShift8; // depends on shift  for 5V reference 0,02 -> 41 other -> 51.2
+    float HorizontalGridVoltage; // voltage per grid for offset etc.
+    int8_t OffsetGridCount; // number of bottom line for offset != 0 Volt.
+    uint32_t TimestampLastRangeChange;
 };
 
 extern struct MeasurementControlStruct MeasurementControl;
 
 // values for DisplayPage
-// using enums increases code size by 120 bytes
+// using enums increases code size by 120 bytes for Arduino
 #define DISPLAY_PAGE_START 0    // Start GUI
 #define DISPLAY_PAGE_CHART 1    // Chart in analyze and running mode
 #define DISPLAY_PAGE_SETTINGS 2
 #define DISPLAY_PAGE_FREQUENCY 3
+#ifndef AVR
+#define DISPLAY_PAGE_MORE_SETTINGS 4
+#define DISPLAY_PAGE_SYST_INFO 5
+#endif
 
 // modes for showInfoMode
 #define INFO_MODE_NO_INFO 0
 #define INFO_MODE_SHORT_INFO 1
 #define INFO_MODE_LONG_INFO 2
 struct DisplayControlStruct {
-	uint8_t TriggerLevelDisplayValue; // For clearing old line of manual trigger level setting
-	int8_t XScale; // Factor for X Data expansion(>0)  0 = no scale, 2->display 1 value 2 times etc.
-	uint8_t DisplayPage;
-	bool DrawWhileAcquire;
-	uint8_t showInfoMode;
-	bool showHistory;
-	uint16_t EraseColor;
+    uint8_t TriggerLevelDisplayValue; // For clearing old line of manual trigger level setting
+    int8_t XScale; // Factor for X Data expansion(>0)  0 = no scale, 2->display 1 value 2 times etc.
+
+    uint8_t DisplayPage;
+    bool DrawWhileAcquire;
+    uint8_t showInfoMode;
+
+    bool showHistory;
+    uint16_t EraseColor;
 };
 extern DisplayControlStruct DisplayControl;
 
-extern char sDataBuffer[50];
+/*
+ * Data buffer
+ */
+struct DataBufferStruct {
+    uint8_t DisplayBuffer[REMOTE_DISPLAY_WIDTH];
+    uint8_t * DataBufferNextInPointer;
+    uint8_t * DataBufferNextDrawPointer; // pointer to DataBuffer - for draw-while-acquire mode
+    uint16_t DataBufferNextDrawIndex; // index in DisplayBuffer - for draw-while-acquire mode
+    // to detect end of acquisition in interrupt service routine
+    uint8_t * DataBufferEndPointer;
+    // Used to synchronize ISR with main loop
+    bool DataBufferFull;
+    // AcqusitionSize is REMOTE_DISPLAY_WIDTH except on last acquisition before stop then it is DATABUFFER_SIZE
+    uint16_t AcquisitionSize;
+    // Pointer for horizontal scrolling
+    uint8_t * DataBufferDisplayStart;
+    uint8_t DataBuffer[DATABUFFER_SIZE]; // contains also display values i.e. (DISPLAY_VALUE_FOR_ZERO - 8BitValue)
+};
+extern DataBufferStruct DataBufferControl;
+
+// for printf etc.
+#ifdef AVR
+#define SIZEOF_STRINGBUFFER 50
+#else
+#define SIZEOF_STRINGBUFFER 240
+#endif
+extern char sStringBuffer[SIZEOF_STRINGBUFFER];
 
 extern BDButton TouchButtonBack;
+// global flag for page control. Is evaluated by calling loop or page and set by buttonBack handler
+extern bool sBackButtonPressed;
 
 #endif //SIMPLETOUCHSCREENDSO_H_

@@ -17,11 +17,18 @@
 #include <inttypes.h>
 #include <avr/pgmspace.h>
 
+/**
+ * From FrequencyGenerator page
+ */
 void initFrequencyGenerator(void);
 void initFrequencyGeneratorPage(void);
 void drawFrequencyGeneratorPage(void);
+void startFrequencyGeneratorPage(void);
+void loopFrequencyGeneratorPage(void);
+void stopFrequencyGeneratorPage(void);
 
-extern BDButton TouchButtonFrequencyPage;
+//extern BDButton TouchButtonFrequencyPage;
+
 extern const char StringStop[] PROGMEM; // "Stop"
 
 #endif //FREQUENCYGENERATOR_H_

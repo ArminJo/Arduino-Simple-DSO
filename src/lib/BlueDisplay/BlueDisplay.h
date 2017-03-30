@@ -338,8 +338,12 @@ static const int FLAG_BUTTON_GLOBAL_SET_BEEP_TONE = 0x02;
 //old
 static const int BUTTON_FLAG_NO_BEEP_ON_TOUCH = 0x00;
 static const int BUTTON_FLAG_DO_BEEP_ON_TOUCH = 0x01;
-static const int BUTTON_FLAG_TYPE_AUTO_RED_GREEN = 0x02; // see void doToggleRedGreenButton() / BDButton.cpp
+static const int BUTTON_FLAG_TYPE_AUTO_RED_GREEN = 0x02;
+// better name for the function
+static const int BUTTON_FLAG_TYPE_TOGGLE_RED_GREEN = 0x02;
 static const int BUTTON_FLAG_TYPE_AUTOREPEAT = 0x04;
+static const int BUTTON_FLAG_TYPE_TOGGLE_RED_GREEN_MANUAL_REFRESH = 0x0A; // must be manually drawn after event to show new caption/color
+
 //new
 static const int FLAG_BUTTON_NO_BEEP_ON_TOUCH = 0x00;
 static const int FLAG_BUTTON_DO_BEEP_ON_TOUCH = 0x01;
@@ -486,11 +490,14 @@ public:
     void debugMessage(const char *aStringPtr);
     void debug(uint8_t aByte);
     void debug(const char* aMessage, uint8_t aByte);
+    void debug(const char* aMessage, int8_t aByte);
     void debug(int8_t aByte);
     void debug(uint16_t aShort);
+    void debug(const char* aMessage, uint16_t aShort);
     void debug(int aShort);
     void debug(const char* aMessage, int aShort);
     void debug(uint32_t aShort);
+    void debug(float aDouble);
     void debug(double aDouble);
 
     void drawLine(uint16_t aXStart, uint16_t aYStart, uint16_t aXEnd, uint16_t aYEnd, Color_t aColor);
@@ -498,8 +505,8 @@ public:
     void drawLineFastOneX(uint16_t x0, uint16_t y0, uint16_t y1, Color_t aColor);
     void drawVectorDegree(uint16_t aXStart, uint16_t aYStart, uint16_t aLength, int aDegree, Color_t aColor,
             int16_t aThickness = 1);
-    void drawVectorRadian(uint16_t aXStart, uint16_t aYStart, uint16_t aLength, int aRadian, Color_t aColor,
-            int16_t aThickness = 1);
+    void drawVectorRadian(uint16_t aXStart, uint16_t aYStart, uint16_t aLength, float aRadian, Color_t aColor, int16_t aThickness =
+            1);
     void drawLineWithThickness(uint16_t aXStart, uint16_t aYStart, uint16_t aXEnd, uint16_t aYEnd, int16_t aThickness,
             Color_t aColor);
     void drawLineRelWithThickness(uint16_t aXStart, uint16_t aYStart, uint16_t aXDelta, uint16_t aYDelta, int16_t aThickness,
@@ -531,7 +538,9 @@ public:
     // Not yet implemented
     //    void getText(void (*aTextHandler)(const char *));
     //    void getTextWithShortPrompt(void (*aTextHandler)(const char *), const char *aShortPromptString);
-    void getInfo(uint16_t aInfoSubcommand, void (*aInfoHandler)(uint8_t *));
+    // results in a info callback
+    void getInfo(uint8_t aInfoSubcommand, void (*aInfoHandler)(uint8_t, uint8_t, uint16_t,
+            ByteShortLongFloatUnion));
     // results in a reorientation callback
     void requestMaxCanvasSize(void);
 
@@ -607,7 +616,6 @@ public:
     struct XYSize mActualDisplaySize;
     struct XYSize mMaxDisplaySize;
     uint32_t mHostUnixTimestamp;
-    uint32_t mLocalMillisForHostTimestamp;
 
     volatile bool mConnectionEstablished;
     volatile bool mOrientationIsLandscape;
@@ -625,6 +633,8 @@ private:
 
 // The instance provided by the class itself
 extern BlueDisplay BlueDisplay1;
+
+void clearDisplayAndDisableButtonsAndSliders(Color_t aColor);
 
 #ifdef LOCAL_DISPLAY_EXISTS
 #include <MI0283QT2.h>
@@ -659,7 +669,7 @@ void writeStringC(const char *aStringPtr, uint8_t aStringLength);
 #endif
 
 /*
- * Utilities used also internal for
+ * Utilities used also internal
  */
 #ifdef AVR
 uint16_t getADCValue(uint8_t aChannel, uint8_t aReference);
