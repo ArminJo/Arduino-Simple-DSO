@@ -1,7 +1,9 @@
 /*
  * EventHandler.cpp
  *
- *   SUMMARY
+ * Implements the methods to receive events from the Android BlueDisplay app.
+ *
+ *  SUMMARY
  *  Blue Display is an Open Source Android remote Display for Arduino etc.
  *  It receives basic draw requests from Arduino etc. over Bluetooth and renders it.
  *  It also implements basic GUI elements as buttons and sliders.
@@ -10,17 +12,18 @@
  *  Copyright (C) 2014  Armin Joachimsmeyer
  *  armin.joachimsmeyer@gmail.com
  *
- *  This file is part of BlueDisplay.
+ *  This file is part of BlueDisplay https://github.com/ArminJo/android-blue-display.
+ *
  *  BlueDisplay is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  (at your option) any later version.
-
+ *
  *  This program is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
-
+ *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/gpl.html>.
  *
@@ -590,7 +593,7 @@ bool getDisplayXYValuesFlag(void) {
 /**
  * show touchpanel data on screen
  */
-void printTPData(int x, int y, Color_t aColor, Color_t aBackColor) {
+void printTPData(int x, int y, color16_t aColor, color16_t aBackColor) {
     char tStringBuffer[12];
     snprintf(tStringBuffer, 12, "X:%03i Y:%03i", sActualPosition.TouchPosition.PosX, sActualPosition.TouchPosition.PosY);
     BlueDisplay1.drawText(x, y, tStringBuffer, TEXT_SIZE_11, aColor, aBackColor);

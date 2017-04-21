@@ -1,16 +1,13 @@
 /*
- * FrequencyGenerator.h
+ * PageFrequencyGenerator.h
  *
- *
- *  Created on:  01.01.2015
- *      Author:  Armin Joachimsmeyer
- *      Email:   armin.joachimsmeyer@gmx.de
- *      License: GPL v3 (http://www.gnu.org/licenses/gpl.html)
- *      Version: 1.0.0
+ *  Copyright (C) 2015  Armin Joachimsmeyer
+ *  Email: armin.joachimsmeyer@gmail.com
+ *  License: GPL v3 (http://www.gnu.org/licenses/gpl.html)
  */
 
-#ifndef FREQUENCYGENERATOR_H_
-#define FREQUENCYGENERATOR_H_
+#ifndef PAGEFREQUENCYGENERATOR_H_
+#define PAGEFREQUENCYGENERATOR_H_
 
 #include "BDButton.h"
 
@@ -31,4 +28,4 @@ void stopFrequencyGeneratorPage(void);
 
 extern const char StringStop[] PROGMEM; // "Stop"
 
-#endif //FREQUENCYGENERATOR_H_
+#endif //PAGEFREQUENCYGENERATOR_H_

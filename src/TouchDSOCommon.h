@@ -1,12 +1,11 @@
 /*
  * TouchDSOCommon.h
- * Declarations from common section
  *
- *  Created on:  01.03.2017
- *      Author:  Armin Joachimsmeyer
- *      Email:   armin.joachimsmeyer@gmx.de
- *      License: GPL v3 (http://www.gnu.org/licenses/gpl.html)
- *      Version: 1.0.0
+ * Declarations for AVR and ARM common section
+ *
+ *  Copyright (C) 2017  Armin Joachimsmeyer
+ *  Email: armin.joachimsmeyer@gmail.com
+ *  License: GPL v3 (http://www.gnu.org/licenses/gpl.html)
  */
 
 #ifndef TOUCHDSOCOMMON_H_
@@ -15,14 +14,58 @@
 #ifdef AVR
 #else
 #endif
+#ifndef AVR
+#endif
 
 #include "BDButton.h"
+#include "BDSlider.h"
+#ifdef AVR
+#include "PageFrequencyGenerator.h"
+#endif
 
 #ifdef AVR
 #else
 // No PROGMEM on ARM
 #define PROGMEM
+#define initPGM init
+#define setCaptionPGM setCaption
+#define setCaptionPGMForValueTrue setCaptionForValueTrue
+#define drawTextPGM drawText
+#define getNumberWithShortPromptPGM getNumberWithShortPrompt
+#define PSTR(a) a
 #endif
+
+#define DISPLAY_VALUE_FOR_ZERO (REMOTE_DISPLAY_HEIGHT - 1)
+//#define DISPLAY_VALUE_FOR_ZERO (REMOTE_DISPLAY_HEIGHT - 2) // Zero line is not exactly at bottom of display to improve readability
+
+//Line colors
+#define COLOR_VOLTAGE_PICKER COLOR_YELLOW
+#define COLOR_VOLTAGE_PICKER_SLIDER RGB(0xFF,0XFF,0xE0) // Light Yellow
+#define COLOR_TRIGGER_LINE COLOR_PURPLE
+#define COLOR_TRIGGER_SLIDER RGB(0xFF,0XF0,0xFF) // light Magenta
+
+#define COLOR_MAX_MIN_LINE COLOR_GREEN
+#define COLOR_HOR_GRID_LINE_LABEL COLOR_BLUE
+#define COLOR_HOR_GRID_LINE_LABEL_NEGATIVE COLOR_RED
+
+/*
+ * CHANNEL
+ */
+#ifdef AVR
+#define ADC_CHANNEL_COUNT 8 // The number of ADC channels
+#else
+#define START_ADC_CHANNEL_INDEX 0  // see also ChannelSelectButtonString
+#ifdef STM32F303xC
+#define ADC_CHANNEL_COUNT 6 // The number of ADC channels
+#else
+#define ADC_CHANNEL_COUNT 6 // The number of ADC channels
+#endif
+#endif
+#define NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR 3 // Channel0 = /1, Ch1= /10, Ch2= /100
+
+extern const char * const ADCInputMUXChannelStrings[ADC_CHANNEL_COUNT];
+extern uint8_t const ADCInputMUXChannels[ADC_CHANNEL_COUNT];
+extern const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR];
 
 /*
  * Trigger values
@@ -113,8 +156,121 @@
 
 extern const float TimebaseExactDivValuesMicros[] PROGMEM;
 #define HORIZONTAL_LINE_LABELS_CAPION_X (REMOTE_DISPLAY_WIDTH - TEXT_SIZE_11_WIDTH * 4)
+/*
+ * OFFSET
+ */
+#define OFFSET_MODE_0_VOLT 0
+#define OFFSET_MODE_AUTOMATIC 1
+#define OFFSET_MODE_MANUAL 2    // not implemented for AVR Implies range mode manual.
+
+/*
+ * GUI LAYOUT,  POSITIONS + SIZES
+ */
+#define INFO_UPPER_MARGIN (1 + TEXT_SIZE_11_ASCEND)
+#define INFO_LEFT_MARGIN 0
+
+#ifdef AVR
+#define FONT_SIZE_INFO_SHORT        TEXT_SIZE_18    // for 1 line info
+#define FONT_SIZE_INFO_LONG         TEXT_SIZE_11    // for 2 lines info
+#define FONT_SIZE_INFO_SHORT_ASC    TEXT_SIZE_18_ASCEND
+#define FONT_SIZE_INFO_LONG_ASC     TEXT_SIZE_11_ASCEND
+#define FONT_SIZE_INFO_LONG_WIDTH   TEXT_SIZE_11_WIDTH
+
+#define SLIDER_SIZE 24
+#define SLIDER_VPICKER_POS_X        0 // Position of slider
+#define SLIDER_VPICKER_INFO_X       (SLIDER_VPICKER_POS_X + SLIDER_SIZE)
+#define SLIDER_VPICKER_INFO_SHORT_Y (FONT_SIZE_INFO_SHORT + FONT_SIZE_INFO_SHORT_ASC)
+#define SLIDER_VPICKER_INFO_LONG_Y  (2 * FONT_SIZE_INFO_LONG + FONT_SIZE_INFO_SHORT_ASC) // since font size is always 18
+
+#define SLIDER_TLEVEL_POS_X         (14 * FONT_SIZE_INFO_LONG_WIDTH) // Position of slider
+#define TRIGGER_LEVEL_INFO_SHORT_X  (SLIDER_TLEVEL_POS_X  + SLIDER_SIZE)
+#define TRIGGER_LEVEL_INFO_LONG_X   (INFO_LEFT_MARGIN + (36 * FONT_SIZE_INFO_LONG_WIDTH))
+#define TRIGGER_LEVEL_INFO_SHORT_Y  (FONT_SIZE_INFO_SHORT + FONT_SIZE_INFO_SHORT_ASC)
+#define TRIGGER_LEVEL_INFO_LONG_Y   FONT_SIZE_INFO_LONG_ASC
+
+#define SETTINGS_PAGE_ROW_INCREMENT BUTTON_HEIGHT_5_256_LINE_2
+#define SETTINGS_PAGE_BUTTON_HEIGHT BUTTON_HEIGHT_5_256
+#define START_PAGE_ROW_INCREMENT BUTTON_HEIGHT_4_256_LINE_2
+#define START_PAGE_BUTTON_HEIGHT BUTTON_HEIGHT_4_256
+
+#define SINGLESHOT_PPRINT_VALUE_X (37 * TEXT_SIZE_11_WIDTH)
+#define SETTINGS_PAGE_INFO_Y (BUTTON_HEIGHT_5_256_LINE_5 - (TEXT_SIZE_11_DECEND + 1))
+#else
+#ifdef LOCAL_DISPLAY_EXISTS
+#define FONT_SIZE_INFO_SHORT        TEXT_SIZE_11    // for 1 line info
+#define FONT_SIZE_INFO_LONG         TEXT_SIZE_11    // for 3 lines info
+#define FONT_SIZE_INFO_SHORT_ASC    TEXT_SIZE_11_ASCEND    // for 3 lines info
+#define FONT_SIZE_INFO_LONG_ASC     TEXT_SIZE_11_ASCEND    // for 3 lines info
+#define FONT_SIZE_INFO_LONG_WIDTH   TEXT_SIZE_11_WIDTH    // for 3 lines info
+#else
+#define FONT_SIZE_INFO_SHORT        TEXT_SIZE_16    // for 1 line info
+#define FONT_SIZE_INFO_LONG         TEXT_SIZE_14    // for 3 lines info
+#define FONT_SIZE_INFO_SHORT_ASC    TEXT_SIZE_16_ASCEND    // for 3 lines info
+#define FONT_SIZE_INFO_LONG_ASC     TEXT_SIZE_14_ASCEND    // for 3 lines info
+#define FONT_SIZE_INFO_LONG_WIDTH   TEXT_SIZE_14_WIDTH    // for 3 lines info
+#endif
+
+#define SLIDER_SIZE 24
+#define SLIDER_VPICKER_POS_X        0 // Position of slider
+#define SLIDER_VPICKER_INFO_X       (SLIDER_VPICKER_POS_X + SLIDER_SIZE)
+#define SLIDER_VPICKER_INFO_SHORT_Y (FONT_SIZE_INFO_SHORT + FONT_SIZE_INFO_SHORT_ASC)
+#define SLIDER_VPICKER_INFO_LONG_Y  (3 * FONT_SIZE_INFO_LONG + FONT_SIZE_INFO_SHORT_ASC) // since font size is always 18
+
+#define SLIDER_TLEVEL_POS_X         (14 * FONT_SIZE_INFO_LONG_WIDTH) // Position of slider
+#define TRIGGER_LEVEL_INFO_SHORT_X  (SLIDER_TLEVEL_POS_X  + SLIDER_SIZE)
+#ifdef LOCAL_DISPLAY_EXISTS
+#define TRIGGER_LEVEL_INFO_LONG_X   (11 * FONT_SIZE_INFO_LONG_WIDTH)
+#else
+#define TRIGGER_LEVEL_INFO_LONG_X   (11 * FONT_SIZE_INFO_LONG_WIDTH +1) // +1 since we have a special character in the string before
+#endif
+#define TRIGGER_LEVEL_INFO_SHORT_Y  (FONT_SIZE_INFO_SHORT + FONT_SIZE_INFO_SHORT_ASC)
+#define TRIGGER_LEVEL_INFO_LONG_Y   (2 * FONT_SIZE_INFO_LONG  + FONT_SIZE_INFO_LONG_ASC)
+
+#define TRIGGER_HIGH_DISPLAY_OFFSET 7 // for trigger state line
+#define SETTINGS_PAGE_ROW_INCREMENT BUTTON_HEIGHT_5_LINE_2
+#define SETTINGS_PAGE_BUTTON_HEIGHT BUTTON_HEIGHT_5
+#define START_PAGE_ROW_INCREMENT BUTTON_HEIGHT_4_LINE_2
+#define START_PAGE_BUTTON_HEIGHT BUTTON_HEIGHT_4
+#endif
+
+extern uint8_t sLastPickerValue;
+
+#ifdef AVR
+extern BDButton TouchButtonADCReference;
+#else
+extern BDButton TouchButtonFFT;
+extern BDButton TouchButtonShowPretriggerValuesOnOff;
+extern BDButton TouchButtonDSOMoreSettings;
+extern BDButton TouchButtonCalibrateVoltage;
+extern BDButton TouchButtonMinMaxMode;
+extern BDButton TouchButtonDrawModeTriggerLine;
+#endif
+#ifdef LOCAL_DISPLAY_EXISTS
+extern BDButton TouchButtonDrawModeLinePixel;
+extern BDButton TouchButtonADS7846TestOnOff;
+extern BDSlider TouchSliderBacklight;
+#endif
+
+extern BDButton TouchButtonSingleshot;
+extern BDButton TouchButtonStartStopDSOMeasurement;
 
 extern BDButton TouchButtonSlope;
+extern BDButton TouchButtonTriggerMode;
+extern BDButton TouchButtonTriggerDelay;
+extern BDButton TouchButtonChartHistoryOnOff;
+extern BDButton TouchButtonSlope;
+extern BDButton TouchButtonAcDc;
+extern BDButton TouchButtonChannels[];
+extern BDButton TouchButtonChannelSelect;
+extern BDButton TouchButtonChannelMode;
+extern BDButton TouchButtonAutoOffsetMode;
+extern const char AutoOffsetButtonStringMan[];
+extern const char AutoOffsetButtonStringAuto[];
+extern const char AutoOffsetButtonString0[];
+extern BDButton TouchButtonAutoRangeOnOff;
+extern BDButton TouchButtonSettingsPage;
+extern BDButton TouchButtonFrequencyPage;
+
 extern char SlopeButtonString[];
 // the index of the slope indicator in char array
 #define SLOPE_STRING_INDEX 6
@@ -130,24 +286,135 @@ extern BDButton TouchButtonAutoRangeOnOff;
 extern const char AutoRangeButtonStringAuto[] PROGMEM;
 extern const char AutoRangeButtonStringManual[] PROGMEM;
 
+extern BDSlider TouchSliderTriggerLevel;
+extern BDSlider TouchSliderVoltagePicker;
+
+// Measurement section
+void startAcquisition(void);
+void prepareForStart(void);
+void setChannel(uint8_t aChannel);
+
+// Stack info
+void initStackFreeMeasurement(void);
+uint16_t getStackFreeMinimumBytes(void);
+void printFreeStack(void);
+
+// Data analysis section
 void computeMinMax(void);
 void computePeriodFrequency(void);
 void setTriggerLevelAndHysteresis(int aRawTriggerValue, int aRawTriggerHysteresis);
 
+// Logic section
+void resetOffset(void);
+void setOffsetAutomatic(bool aNewState);
+void setACMode(bool aNewACMode);
+int changeOffsetGridCount(int aValue);
+#ifdef AVR
+uint8_t changeRange(int8_t aChangeAmount);
+uint8_t changeTimeBaseValue(int8_t aChangeValue);
+#else
+int changeDisplayRangeAndAdjustOffsetGridCount(int aValue);
+int changeTimeBaseValue(int aChangeValue);
+
+#endif
+int changeXScale(int aValue);
+
+// Output and draw section
+void initDSOGUI(void);
+
 void redrawDisplay(void);
+void drawStartPage(void);
+void drawDSOSettingsPage(void);
+void drawDSOMoreSettingsPage(void);
+
 void drawGridLinesWithHorizLabelsAndTriggerLine();
 void drawTriggerLine(void);
+void drawMinMaxLines(void);
 void clearTriggerLine(uint8_t aTriggerLevelDisplayValue);
+void drawRunningOnlyPartOfGui(void);
+void activateChartGui(void);
+#ifdef AVR
+uint8_t scrollChart(int aValue);
+uint8_t getDisplayFromRawInputValue(uint16_t aRawValue);
+void drawDataBuffer(uint8_t *aByteBuffer, uint16_t aColor, uint16_t aClearBeforeColor);
+#else
+int scrollChart(int aValue);
+int getDisplayFromRawInputValue(int aAdcValue);
+void drawDataBuffer(uint16_t *aDataBufferPointer, int aLength, color16_t aColor, color16_t aClearBeforeColor, int aDrawMode,
+        bool aDrawAlsoMin);
+void startSystemInfoPage(void);
+#endif
+
+// Text output section
+extern unsigned int sMillisSinceLastInfoOutput;
+void printfTriggerDelay(char * aDataBufferPtr, uint16_t aTriggerDelayMillisOrMicros);
+void printVCCAndTemperature(void);
+void clearInfo(uint8_t aOldMode);
+void printInfo(void);
+void printTriggerInfo(void);
+
+// GUI event handler section
+void doTouchUp(struct TouchEvent * const aTochPosition);
+void doLongTouchDownDSO(struct TouchEvent * const aTochPosition);
+void doSwipeEndDSO(struct Swipe * const aSwipeInfo);
+void doSetTriggerDelay(float aValue);
+
+// Button handler section
+#ifdef AVR
+void doADCReference(BDButton * aTheTouchedButton, int16_t aValue);
+#else
+void doShowPretriggerValuesOnOff(BDButton * aTheTouchedButton, int16_t aValue);
+void doShowFFT(BDButton * aTheTouchedButton, int16_t aValue);
+void doMinMaxMode(BDButton * aTheTouchedButton, int16_t aValue);
+void doShowMoreSettingsPage(BDButton * aTheTouchedButton, int16_t aValue);
+void doShowSystemInfoPage(BDButton * aTheTouchedButton, int16_t aValue);
+void doVoltageCalibration(BDButton * aTheTouchedButton, int16_t aValue);
+void doDrawModeTriggerLine(BDButton * aTheTouchedButton, int16_t aValue);
+#endif
+void doStartStopDSO(BDButton * aTheTouchedButton, int16_t aValue);
+void doDefaultBackButton(BDButton * aTheTouchedButton, int16_t aValue);
+void doShowFrequencyPage(BDButton * aTheTouchedButton, int16_t aValue);
+void doShowSettingsPage(BDButton * aTheTouchedButton, int16_t aValue);
+void doTriggerSlope(BDButton * aTheTouchedButton, int16_t aValue);
+void doStartSingleshot(BDButton * aTheTouchedButton, int16_t aValue);
+void doTriggerMode(BDButton * aTheTouchedButton, int16_t aValue);
+void doRangeMode(BDButton * aTheTouchedButton, int16_t aValue);
+void doChartHistory(BDButton * aTheTouchedButton, int16_t aValue);
+void doPromptForTriggerDelay(BDButton * aTheTouchedButton, int16_t aValue);
+void doChannelSelect(BDButton * aTheTouchedButton, int16_t aValue);
+void doOffsetMode(BDButton * aTheTouchedButton, int16_t aValue);
+void doAcDcMode(BDButton * aTheTouchedButton, int16_t aValue);
+#ifdef LOCAL_DISPLAY_EXISTS
+void readADS7846Channels(void);
+void doADS7846TestOnOff(BDButton * aTheTouchedButton, int16_t aValue);
+void doDrawMode(BDButton * aTheTouchedButton, int16_t aValue);
+#endif
+
+// Slider handler section
+void doTriggerLevel(BDSlider * aTheTouchedSlider, uint16_t aValue);
+void doVoltagePicker(BDSlider * aTheTouchedSlider, uint16_t aValue);
+
+// Button caption section
+#ifdef AVR
+#else
+void setMinMaxModeButtonCaption(void);
+#endif
 
 void setSlopeButtonCaption(void);
 void setTriggerModeButtonCaption(void);
 void setAutoRangeModeAndButtonCaption(bool aNewAutoRangeMode);
-
-void doTriggerSlope(BDButton * aTheTouchedButton, int16_t aValue);
-void doTriggerMode(BDButton * aTheTouchedButton, int16_t aValue);
-void doRangeMode(BDButton * aTheTouchedButton, int16_t aValue);
-void doChartHistory(BDButton * aTheTouchedButton, int16_t aValue);
+void setChannelButtonsCaption(void);
+void setReferenceButtonCaption(void);
+void setACModeButtonCaption(void);
+void setTriggerDelayCaption(void);
+void setAutoOffsetButtonCaption(void);
 
 uint32_t getMicrosFromHorizontalDisplayValue(uint16_t aDisplayValueHorizontal, uint8_t aNumberOfPeriods);
+
+#ifdef AVR
+#else
+#endif
+#ifndef AVR
+#endif
 
 #endif // TOUCHDSOCOMMON_H_

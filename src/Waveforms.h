@@ -1,8 +1,10 @@
 /*
  * Waveforms.h
  *
- *  Created on: 24.03.2017
- *      Author: Armin
+ *  Copyright (C) 2017  Armin Joachimsmeyer
+ *  Email: armin.joachimsmeyer@gmail.com
+ *  License: GPL v3 (http://www.gnu.org/licenses/gpl.html)
+ *
  */
 
 #ifndef WAVEFORMS_H_
@@ -18,7 +20,7 @@
 struct FrequencyInfoStruct {
     union {
         uint32_t DividerInt; // Value used by hardware - may be (divider * prescaler)
-        uint32_t sBaseFrequencyFactorShift16; // Value use by ISR
+        uint32_t sBaseFrequencyFactorShift16; // Value used by ISR
     } ControlValue;
     uint32_t PeriodMicros; // for CTC resolution of value of DividerInt is 8 times better
     // use float, since we have a logarithmic slider readout and therefore a lot of values between 1 and 2.
@@ -32,16 +34,19 @@ struct FrequencyInfoStruct {
 };
 extern struct FrequencyInfoStruct sFrequencyInfo;
 
+extern const char FrequencyFactorChars[4];
+
 void setWaveformMode(uint8_t aNewMode);
 void cycleWaveformMode();
 const char * cycleWaveformModePGMString();
 const char * getWaveformModePGMString();
+const char * getWaveformRangePGMString();
 
 void initTimer1For8BitPWM();
 bool setWaveformFrequency();
 bool setSquareWaveFrequency();
 void setFrequency(float aValue);
-void setSquareWaveFrequencyFactor(int aIndexValue);
+void setFrequencyFactor(int aIndexValue);
 
 void stopWaveform();
 void startWaveform();

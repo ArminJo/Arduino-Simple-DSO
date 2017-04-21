@@ -1,6 +1,7 @@
 # Arduino-Simple-DSO
+This is the eclipse project repository. This DSO-code is also available as an Arduino example sketch under [Arduino-BlueDisplay](https://github.com/ArminJo/Arduino-BlueDisplay).
 
-##SUMMARY
+## SUMMARY
 The DSO needs only a standard Arduino-Uno or Arduino-Micro, a HC-05 Bluetooth module and this software.
 
 ## Features
@@ -48,7 +49,7 @@ On second line
 ## TOUCH
 Short touch switches info output, long touch shows active GUI elements.
 
-#SCHEMATIC
+# SCHEMATICS
 Schematic
 ![Fritzing schematic](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Schaltplan.png)
 Breadboard schematic
@@ -56,13 +57,13 @@ Breadboard schematic
 DSO with passive attenuator on breadboard
 ![DSO with passive attenuator on breadboard](https://github.com/ArminJo/android-blue-display/blob/gh-pages/pictures/ArduinoDSO.jpg)
 
-#SCREENSHOTS
+# SCREENSHOTS
 DSO settings menu
 ![DSO settings menu](https://github.com/ArminJo/android-blue-display/blob/gh-pages/screenshots/DSOSettings.png)
 DSO frequency generator menu
 ![Frequency generator menu](https://github.com/ArminJo/android-blue-display/blob/gh-pages/screenshots/Frequency.png)
 
-#SIMPLE VERSION
+# SIMPLE VERSION
 Simple Schematic
 ![Fritzing schematic](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Simple_Schaltplan.png)
 Simple Breadboard schematic

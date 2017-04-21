@@ -1,17 +1,26 @@
 /*
- *  PageFrequencyGenerator.cpp
+ * PageFrequencyGenerator.cpp
  *
- *  Waveform frequency is not stable and decreased when DSO is running since then not all overflow interrupts can be handled
+ * Frequency output from 119 mHz (8.388 second) to 8MHz on Arduino
+ * Waveform frequency is not stable and decreased when DSO is running since then not all overflow interrupts can be handled
  *
- *  Created on: 01.01.2015
- *      Author: Armin Joachimsmeyer
- *      Email: armin.joachimsmeyer@gmail.com
- *      License: GPL v3 (http://www.gnu.org/licenses/gpl.html)
+ *  Copyright (C) 2015  Armin Joachimsmeyer
+ *  Email: armin.joachimsmeyer@gmail.com
  *
- *      Sources: http://code.google.com/p/simple-touch-screen-dso-software/
+ *  This file is part of Arduino-Simple-DSO https://github.com/ArminJo/Arduino-Simple-DSO.
  *
- *      Features:
- *      Frequency output from 119 mHz (8.388 second) to 8MHz on Arduino
+ *  Arduino-Simple-DSO is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/gpl.html>.
  *
  */
 
@@ -71,9 +80,9 @@ const char* RangeButtonStrings[5] = { StringmHz, StringHz, String10Hz, StringkHz
 #else
 const uint16_t FixedFrequencyButtonCaptions[NUMBER_OF_FIXED_FREQUENCY_BUTTONS] = {1, 2, 5, 10, 20, 50, 100, 200, 500, 1000};
 const char* const RangeButtonStrings[5] = {"mHz", "Hz", "10Hz", "kHz", "MHz"};
+const char FrequencyFactorChars[4] = { 'm', ' ', 'k', 'M' };
 #endif
 
-const char FrequencyFactorChars[4] = { 'm', ' ', 'k', 'M' };
 #define INDEX_OF_10HZ 2
 
 #ifndef AVR
@@ -99,7 +108,7 @@ struct FrequencyInfoStruct {
 };
 struct FrequencyInfoStruct sFrequencyInfo;
 
-void setSquareWaveFrequencyFactor(int aIndexValue) {
+void setFrequencyFactor(int aIndexValue) {
     sFrequencyInfo.FrequencyFactorIndex = aIndexValue;
     uint32_t tFactor = 1;
     while (aIndexValue > 0) {
@@ -122,7 +131,7 @@ const char * getWaveformModePGMString() {
     return tResultString;
 }
 
-bool setWaveformFrequency(FrequencyInfoStruct * aFrequencyInfo) {
+bool setWaveformFrequency() {
     bool hasError = false;
     if (sFrequencyInfo.Waveform == WAVEFORM_SQUARE) {
         float tPeriod = (36000000000 / sFrequencyInfo.FrequencyFactorTimes1000) / sFrequencyInfo.Frequency;
@@ -161,10 +170,10 @@ void setFrequency(float aValue) {
             tIndex = 0; //mHz
             aValue *= 1000;
         }
-        setSquareWaveFrequencyFactor(tIndex);
+        setFrequencyFactor(tIndex);
     }
     sFrequencyInfo.Frequency = aValue;
-    setWaveformFrequency(&sFrequencyInfo);
+    setWaveformFrequency();
 }
 #endif
 
@@ -339,7 +348,7 @@ void initFrequencyGeneratorPageGui() {
             tButtonColor = BUTTON_AUTO_RED_GREEN_TRUE_COLOR;
         }
         TouchButtonFrequencyRanges[i].initPGM(tXPos, tYPos, BUTTON_WIDTH_5 + BUTTON_DEFAULT_SPACING_HALF,
-        BUTTON_HEIGHT_5, tButtonColor, RangeButtonStrings[i], TEXT_SIZE_22, BUTTON_FLAG_DO_BEEP_ON_TOUCH, i,
+        BUTTON_HEIGHT_5, tButtonColor, RangeButtonStrings[i], TEXT_SIZE_22, FLAG_BUTTON_DO_BEEP_ON_TOUCH, i,
                 &doChangeFrequencyRange);
 
         tXPos += BUTTON_WIDTH_5 + BUTTON_DEFAULT_SPACING - 2;
@@ -348,15 +357,15 @@ void initFrequencyGeneratorPageGui() {
     ActiveTouchButtonFrequencyRange = TouchButtonFrequencyRanges[BUTTON_INDEX_SELECTED_INITIAL];
 
     TouchButtonFrequencyStartStop.initPGM(0, REMOTE_DISPLAY_HEIGHT - BUTTON_HEIGHT_4, BUTTON_WIDTH_3, BUTTON_HEIGHT_4, 0,
-            PSTR("Start"), TEXT_SIZE_26, BUTTON_FLAG_DO_BEEP_ON_TOUCH | BUTTON_FLAG_TYPE_TOGGLE_RED_GREEN,
+            PSTR("Start"), TEXT_SIZE_26, FLAG_BUTTON_DO_BEEP_ON_TOUCH | FLAG_BUTTON_TYPE_TOGGLE_RED_GREEN,
             sFrequencyInfo.isOutputEnabled, &doFrequencyGeneratorStartStop);
     TouchButtonFrequencyStartStop.setCaptionPGMForValueTrue(PSTR("Stop"));
 
     TouchButtonGetFrequency.initPGM(BUTTON_WIDTH_3_POS_2, REMOTE_DISPLAY_HEIGHT - BUTTON_HEIGHT_4, BUTTON_WIDTH_3,
-    BUTTON_HEIGHT_4, COLOR_BLUE, PSTR("Hz..."), TEXT_SIZE_22, BUTTON_FLAG_DO_BEEP_ON_TOUCH, 0, &doGetFrequency);
+    BUTTON_HEIGHT_4, COLOR_BLUE, PSTR("Hz..."), TEXT_SIZE_22, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 0, &doGetFrequency);
 
     TouchButtonWaveform.init(BUTTON_WIDTH_3_POS_3, REMOTE_DISPLAY_HEIGHT - BUTTON_HEIGHT_4, BUTTON_WIDTH_3,
-    BUTTON_HEIGHT_4, COLOR_BLUE, "", TEXT_SIZE_18, BUTTON_FLAG_DO_BEEP_ON_TOUCH, sFrequencyInfo.Waveform, &doWaveformMode);
+    BUTTON_HEIGHT_4, COLOR_BLUE, "", TEXT_SIZE_18, FLAG_BUTTON_DO_BEEP_ON_TOUCH, sFrequencyInfo.Waveform, &doWaveformMode);
     setWaveformButtonCaption();
 }
 
@@ -480,7 +489,7 @@ void doChangeFrequencyRange(BDButton * aTheTouchedButton, int16_t aValue) {
         if (aValue >= INDEX_OF_10HZ) {
             aValue--;
         }
-        setSquareWaveFrequencyFactor(aValue);
+        setFrequencyFactor(aValue);
         SetWaveformFrequencyAndPrintValues();
     }
 }

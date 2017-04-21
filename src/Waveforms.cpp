@@ -1,21 +1,31 @@
 /*
- *  Waveforms.cpp
+ * Waveforms.cpp
  *
- *  Code uses 16 bit AVR Timer 1 and generates a 62.5 kHz PWM signal with 8 Bit resolution resulting in a sine, a triangle and a sawtooth.
- *  In CTC Mode it generates square wave from 0.119 Hz up to 8 MHz (full range for Timer 1).
- *  Timer 1 is used by Arduino for Servo Library. For 8 bit you could also use Timer 2 which is used for Arduino tone().
+ * Code uses 16 bit AVR Timer1 and generates a 62.5 kHz PWM signal with 8 Bit resolution.
+ * After every PWM every cycle an interrupt handler sets a new PWM value, resulting in a sine, triangle or sawtooth output.
+ * New value is taken by a rolling index from a table, or directly computed from that index.
+ * By using a "floating point" index increment, every frequency can be generated.
  *
- *  Output is at PIN 10
- *  PWM Waveform generation is interrupt driven.
+ * In CTC Mode Timer1 generates square wave from 0.119 Hz up to 8 MHz (full range for Timer1).
+ * Timer1 is used by Arduino for Servo Library. For 8 bit resolution you could also use Timer2 which is used for Arduino tone().
+ *
+ * Output is at PIN 10
  *
  *  Copyright (C) 2017  Armin Joachimsmeyer
- *  armin.joachimsmeyer@gmail.com
+ *  Email: armin.joachimsmeyer@gmail.com
+ *
+ *  This file is part of Arduino-Simple-DSO https://github.com/ArminJo/Arduino-Simple-DSO.
+ *
+ *  Arduino-Simple-DSO is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
  *
  *  This program is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
-
+ *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/gpl.html>.
  *
@@ -24,11 +34,9 @@
 #include <Arduino.h>
 #include "Waveforms.h"
 
-//#define USE_STANDARD_SERIAL
-
 #define TIMER_PRESCALER_MASK 0x07
 
-struct FrequencyInfoStruct sFrequencyInfo ;
+struct FrequencyInfoStruct sFrequencyInfo;
 
 /*
  * Sine table from 0 to 90 degree including 0 AND 90 degree therefore we have an odd number
@@ -37,26 +45,30 @@ struct FrequencyInfoStruct sFrequencyInfo ;
 #define SIZE_OF_SINE_TABLE_QUARTER 32
 const uint8_t sSineTableQuarter128[SIZE_OF_SINE_TABLE_QUARTER + 1] PROGMEM = { 128, 135, 141, 147, 153, 159, 165, 171, 177, 182,
         188, 193, 199, 204, 209, 213, 218, 222, 226, 230, 234, 237, 240, 243, 245, 248, 250, 251, 253, 254, 254, 255, 255 };
+// Base period, if exact one next value of table is taken at every interrupt
 // 8 Bit PWM resolution gives 488.28125Hz sine base frequency: 1/16 us * 256 * 128 = 16*128 = 2048us = 488.28125Hz
-#define BASE_PERIOD_FOR_SINE_TABLE 2048UL // (1/F_CPU) * PWM_RESOLUTION * SIZE_OF_SINE_TABLE_QUARTER * 4
+#define BASE_PERIOD_FOR_SINE_TABLE 2048UL // ((1/F_CPU) * PWM_RESOLUTION) * (SIZE_OF_SINE_TABLE_QUARTER * 4)
 
-#define BASE_PERIOD_FOR_TRIANGLE 8176UL // (1/F_CPU) * PWM_RESOLUTION * (256+255) -> 122.3092Hz
-#define BASE_PERIOD_FOR_SAWTOOTH 4096UL // (1/F_CPU) * PWM_RESOLUTION * 256 -> 244.140625Hz
+#define BASE_PERIOD_FOR_TRIANGLE 8176UL // (1/F_CPU) * PWM_RESOLUTION * (256+255) Values -> 122.3092Hz
+#define BASE_PERIOD_FOR_SAWTOOTH 4096UL // (1/F_CPU) * PWM_RESOLUTION * 256 Values -> 244.140625Hz
 
 int8_t sSineTableIndex = 0;
 uint8_t sNumberOfQuadrant = 0;
 uint8_t sNextOcrbValue = 0;
 
-/*
+const char FrequencyFactorChars[4] = { 'm', ' ', 'k', 'M' };
 
+/*
+ * 8-bit PWM Output at PIN 10
+ * Overflow interrupt is generated every cycle -> this is used to generate the waveforms
  */
 void initTimer1For8BitPWM() {
     DDRB |= _BV(DDB2); // set pin OC1B = PortB2 -> PIN 10 to output direction
 
+    TCCR1A = _BV(COM1B1) | _BV(WGM10); // Clear OC1B on Compare Match.  With WGM12 Waveform Generation Mode 5 - Fast PWM 8-bit,
     //    TCCR1A = _BV(COM1A1) | _BV(COM1B1) | _BV(WGM11); // With WGM12 Waveform Generation Mode 6 - Fast PWM, 9-bit
     //    TCCR1A = _BV(COM1A1) | _BV(COM1B1) | _BV(WGM11) | _BV(WGM10); // With WGM12 Waveform Generation Mode 7 - Fast PWM, 10-bit
-    TCCR1A = _BV(COM1B1) | _BV(WGM10); // Clear OC1B on Compare Match.  With WGM12 Waveform Generation Mode 5 - Fast PWM 8-bit,
-    TCCR1B = _BV(WGM12); // set OC1A/OC1B at BOTTOM (non-inverting mode) - no clock->timer disabled
+    TCCR1B = _BV(WGM12); // set OC1A/OC1B at BOTTOM (non-inverting mode) - no clock (prescaler) -> timer disabled now
 
     OCR1A = 0xFF;   // output DC - HIGH
     OCR1B = 0xFF;   // output DC - HIGH
@@ -114,23 +126,30 @@ const char * getWaveformModePGMString() {
 void setFrequency(float aValue) {
     uint8_t tIndex = 1;
     if (sFrequencyInfo.Waveform == WAVEFORM_SQUARE) {
-        while (aValue > 1000) {
-            aValue /= 1000;
-            tIndex++;
-        }
+        // normalize Frequency to 1 - 1000 and compute SquareWaveFrequencyFactor
         if (aValue < 1) {
             tIndex = 0; //mHz
             aValue *= 1000;
+        } else {
+            while (aValue > 1000) {
+                aValue /= 1000;
+                tIndex++;
+            }
         }
     }
-    setSquareWaveFrequencyFactor(tIndex);
+    /*
+     * FrequencyFactor is not needed for PWM.
+     * Set to one for PWM since it might be used for display of Frequency
+     */
+    setFrequencyFactor(tIndex);
     sFrequencyInfo.Frequency = aValue;
     setWaveformFrequency();
 }
 
 /*
- * SINE: clip to 8 samples / 128us per period = 7,8125Hz
- * SAWTOOTH: clip to 16 samples / 256us per period = 3906.25Hz
+ * SINE: clip to minimum 8 samples per period => 128us / 7812.5Hz
+ * SAWTOOTH: clip to minimum 16 samples per period => 256us / 3906.25Hz
+ * Triangle: clip to minimum 32 samples per period => 512us / 1953.125Hz
  */
 bool setWaveformFrequency() {
     bool hasError = false;
@@ -138,26 +157,27 @@ bool setWaveformFrequency() {
         // need initialized sFrequencyInfo structure
         hasError = setSquareWaveFrequency();
     } else {
+        // use shift 16 to increase resolution but avoid truncation
         long tBasePeriodShift16 = (BASE_PERIOD_FOR_SINE_TABLE << 16);
         if (sFrequencyInfo.Waveform == WAVEFORM_TRIANGLE) {
             tBasePeriodShift16 = (BASE_PERIOD_FOR_TRIANGLE << 16);
         } else if (sFrequencyInfo.Waveform == WAVEFORM_SAWTOOTH) {
             tBasePeriodShift16 = (BASE_PERIOD_FOR_SAWTOOTH << 16);
         }
-        sFrequencyInfo.PeriodMicros = 1000000000UL / (sFrequencyInfo.Frequency * sFrequencyInfo.FrequencyFactorTimes1000);
+        sFrequencyInfo.PeriodMicros = 1000000UL / sFrequencyInfo.Frequency;
         uint32_t tBaseFrequencyFactorShift16 = tBasePeriodShift16 / sFrequencyInfo.PeriodMicros;
-        if (tBaseFrequencyFactorShift16 > 0x100000) {
+        if (tBaseFrequencyFactorShift16 > (16L << 16)) {
             // Clip at factor 16 and recompute values
-            tBaseFrequencyFactorShift16 = 0x100000;
-            sFrequencyInfo.PeriodMicros = tBasePeriodShift16 >> 20;
-            sFrequencyInfo.Frequency = 1000000000UL / (sFrequencyInfo.PeriodMicros * sFrequencyInfo.FrequencyFactorTimes1000);
+            tBaseFrequencyFactorShift16 = (16L << 16);
+            sFrequencyInfo.PeriodMicros = (tBasePeriodShift16 >> 16) / 16;
+            sFrequencyInfo.Frequency = 1000000UL / sFrequencyInfo.PeriodMicros;
             hasError = true;
         }
         sFrequencyInfo.ControlValue.sBaseFrequencyFactorShift16 = tBaseFrequencyFactorShift16;
 
         sFrequencyInfo.PrescalerRegisterValue = 1;
         if (sFrequencyInfo.isOutputEnabled) {
-            // start timer
+            // start Timer1 for PWM generation
             TCCR1B &= ~TIMER_PRESCALER_MASK;
             TCCR1B |= _BV(CS10); // set prescaler to 1 -> gives 16us / 62.5kHz PWM
         }
@@ -266,7 +286,7 @@ bool setSquareWaveFrequency() {
     return hasError;
 }
 
-void setSquareWaveFrequencyFactor(int aIndexValue) {
+void setFrequencyFactor(int aIndexValue) {
     sFrequencyInfo.FrequencyFactorIndex = aIndexValue;
     uint32_t tFactor = 1;
     while (aIndexValue > 0) {
@@ -292,6 +312,10 @@ ISR(TIMER1_OVF_vect) {
 
     // output value at start of ISR to avoid jitter
     OCR1B = sNextOcrbValue;
+    /*
+     * Increase index by sBaseFrequencyFactor.
+     * In order to avoid floating point arithmetic use sBaseFrequencyFactorShift16 and handle resulting residual.
+     */
     int8_t tIndexDelta = sFrequencyInfo.ControlValue.sBaseFrequencyFactorShift16 >> 16;
     // handle fraction of frequency Factor
     sBaseFrequencyFactorAccumulator += sFrequencyInfo.ControlValue.sBaseFrequencyFactorShift16 & 0xFFFF;
@@ -337,22 +361,22 @@ ISR(TIMER1_OVF_vect) {
              */
             //    // [0,90)
             //    for (int i = 0; i < SIZE_OF_SINE_TABLE_QUARTER; ++i) {
-            //        OCR1B = sSineTableQuarter128[i];  // Pin9
+            //        OCR1B = sSineTableQuarter128[i];
             //        delayMicroseconds(sDelay);
             //    }
             //    // [90,180)
             //    for (int i = SIZE_OF_SINE_TABLE_QUARTER; i > 0; i--) {
-            //        OCR1B = sSineTableQuarter128[i];  // Pin9
+            //        OCR1B = sSineTableQuarter128[i];
             //        delayMicroseconds(sDelay);
             //    }
             //    // [180,270)
             //    for (int i = 0; i < SIZE_OF_SINE_TABLE_QUARTER; ++i) {
-            //        OCR1B = -(sSineTableQuarter128[i]);  // Pin9
+            //        OCR1B = -(sSineTableQuarter128[i]);
             //        delayMicroseconds(sDelay);
             //    }
             //    // [270,360)
             //    for (int i = SIZE_OF_SINE_TABLE_QUARTER; i > 0; i--) {
-            //        OCR1B = -(sSineTableQuarter128[i]);  // Pin9
+            //        OCR1B = -(sSineTableQuarter128[i]);
             //        delayMicroseconds(sDelay);
             //    }
         } else if (sFrequencyInfo.Waveform == WAVEFORM_TRIANGLE) {

@@ -1,34 +1,73 @@
 /*
- *      Created on: 29.03.2012
- *      Author: Armin Joachimsmeyer
- *      Email: armin.joachimsmeyer@gmail.com
- *      License: GPL v3 (http://www.gnu.org/licenses/gpl.html)
+ * SimpleTouchScreenDSO.cpp
  *
- *      Sources: https://github.com/ArminJo/Arduino-Simple-DSO
+ *  Copyright (C) 2015  Armin Joachimsmeyer
+ *  Email: armin.joachimsmeyer@gmail.com
+ *
+ *  This file is part of Arduino-Simple-DSO https://github.com/ArminJo/Arduino-Simple-DSO.
+ *
+ *  Arduino-Simple-DSO is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/gpl.html>.
  *
  *      Features:
  *      No dedicated hardware, just a plain arduino, a HC-05 Bluetooth module and this software.
  *      Full touch screen control of all parameters.
- *      150/300 kSamples per second
+ *      150/300 kSamples per second.
  *      Supports AC Measurement with (passive) external attenuator circuit.
  *      3 different types of external attenuator detected by software.
  *        - no attenuator (pin 8+9 left open).
  *        - passive attenuator with /1, /10, /100 attenuation (pin 8 connected to ground).
  *        - active attenuator (pin 9 connected to ground).
- *      Automatic trigger, range and offset value selection
- *      External trigger as well as delayed trigger possible
- *      1120 Byte data buffer - 3 * display width
- *      Min, max, average and peak to peak display
- *      Period and frequency display
- *      All settings can be changed during measurement
- *      Gesture (swipe) control of timebase and chart
- *      All AVR ADC input channels selectable
- *      Touch trigger level select
+ *      Automatic trigger, range and offset value selection.
+ *      External trigger as well as delayed trigger possible.
+ *      1120 Byte data buffer - 3 * display width.
+ *      Min, max, average and peak to peak display.
+ *      Period and frequency display.
+ *      All settings can be changed during measurement.
+ *      Gesture (swipe) control of timebase and chart.
+ *      All AVR ADC input channels selectable.
+ *      Touch trigger level select.
  *      1.1 Volt internal reference. 5 Volt (VCC) also usable.
  *
  *      The code can also be used as an example of C++/Assembler coding
  *      and complex interrupt handling routine
  *
+ *      The touch DSO software has 4 pages.
+ *      1. The start page which shows all the hidden buttons available at the chart page.
+ *      2. The chart page which shows the data and info line(s).
+ *      3. The settings page.
+ *      4. The frequency generator page.
+ *      The display of new data on the settings and frequency generator page helps to understand the effect of the settings chosen.
+ *
+ *      Control features:
+ *      Long touch toggles between display of start and chart page.
+ *      On chart page at the left a voltage picker (slider) is shown.
+ *      If trigger manual is enabled a second slider area is shown to select trigger value.
+ *      Short touch on chart page at no (hidden) button area and switches through the info line modes.
+ *      Horizontal swipe on chart page changes timebase while running, else scrolls the data chart.
+ *      Vertical swipe on chart page changes the range if manual range is enabled.
+ *
+ *      Settings:
+ *      "Trigger man timeout" means manual trigger value, but with timeout, i.e. if trigger condition not met, new data is shown after timeout.
+ *          - This is not really a manual trigger level mode, but it helps to find the right trigger value.
+ *      "Trigger man" means manual trigger, but without timeout, i.e. if trigger condition not met, no new data is shown.
+ *      "Trigger free" means free running trigger, i.e. trigger condition is always met.
+ *      "Trigger ext" uses pin 2 as external trigger source.
+ *      "Trigger delay" can be specified from 4 us to 64.000 ms (if you really want).
+ *
+ *      "Offset man" is currently not implemented and works like "Offset 0V".
+ *
+ *      "DC / AC" Button is only visible for these channels having a AC/DC switch/input at configurations ATTENUATOR_TYPE_FIXED_ATTENUATOR + ATTENUATOR_TYPE_ACTIVE_ATTENUATOR
  */
 
 /*
@@ -36,37 +75,39 @@
  *
  * Attenuator circuit and AC/DC switch
  *
- *          D2    ADC INPUT_0  1.1 Volt         ADC INPUT_1 11 Volt        ADC INPUT_2 110 Volt
- *          /\          /\                         /\     ______              /\     ______
- *          |           |                          +-----| 220k |----+        +-----| 10 k |----------+
- *          _           |      ______              |      ______     |        |      ------           |
- *         | |          +-----| >4 M |----+        +-----| 220k |----+        |      _____            |
- *         | | 100 k    |      ------     |        |      ------     |        +-----| 5 M |-+ 2*5 M or|
- *         | |          _                 |        _                 |        _      -----  _ 3*3.3 M |
- *          -          | |                |       | |                |       | |           | |        |
- *          |          | | 10 k           |       | | 1 M            |       | | 1 M       | | 5 M    |
- *          O          | |                |       | |                |       | |           | |        |
- *   External_Trigger   -                 |        -                 |        -             -         |
- *                      |                 |        |                 |        |             |         |
- *                      +----+            |        +----+            |        +----+        +----+    |
- *                      |    |            |        |    |            |        |    |        |    |    |
- *                      |    = C 0.1uF    |        |    = C 0.1uF    |        |    = 0.1uF  |    = 0.1uF  400 Volt
- *                      |    |            |        |    |            |        |    |        |    |    |
- *                      O    O            |        O    O            |        O    O        O    O    |
- *                     DC   AC            |       DC   AC            |       DC   AC       DC   AC    |
- *          D3                            |                          |                     1000 V Range
- *          /\           +----------------+--------------------------+--------------------------------+
- *          |            |
- *          O            O
- *         / _________  /   AC/DC            D8/Mode       D10/Frequency generator
- *        /            /    Switch             /\             \/
- * GND--O/    O      O/    O----------+        |              |
- *     AC     DC  AC |     DC         |        |              |
- *         ______    |       ______   |        |              |
- *   VREF-| 100k |---+------| 100k |--+        |              \/
- *         ------    |       ------   |        |
- *                   +--------||------+-GND----+
- *                          33 uF
+ *                ADC INPUT_0  1.1 Volt         ADC INPUT_1 11 Volt        ADC INPUT_2 110 Volt
+ *                      /\                         /\     ______              /\    ______
+ *                      |                          +-----| 220k |----+        +----| 10k  |-----------+
+ *                      |     _______              |      ______     |        |     ------            |
+ *                      +----| >4.7M |----+        +-----| 220k |----+        |     ______            |
+ *                      |     -------     |        |      ------     |        +----| 4.7M |-+ 2*4.7M or
+ *                      _                 |        _                 |        _     ------  _ 3*3.3M  |
+ *                     | |                |       | |                |       | |           | |        |
+ *                     | | 10k            |       | | 1M             |       | | 1 M       | | 4.7 M  |
+ *                     | |                |       | |                |       | |           | |        |
+ *                      -                 |        -                 |        -             -         |
+ *       VREF           |                 |        |                 |        |             |         |
+ *         /\           +----+            |        +----+            |        +----+        +----+    |
+ *         |            |    |            |        |    |            |        |    |        |    |    |
+ *         _            |    = C 0.1uF    |        |    = C 0.1uF    |        |    = 0.1uF  |    = 0.1uF  400 Volt
+ *        | |           |    |            |        |    |            |        |    |        |    |    |
+ *        | | 100k      O    O            |        O    O            |        O    O        O    O    |
+ *        | |          DC   AC            |       DC   AC            |       DC   AC       DC   AC    |
+ *         -                              |                          |                    1000V Range |
+ *         |                              |                          |                                |
+ *   A5 ---+-------------+----------------+--------------------------+--------------------------------+
+ * AC bias |             |
+ *         _             |   Sine/Triangle/Sawtooth   D10                D2
+ *        | |            |            O               \/                 /\
+ *        | | 100k       = 6.8uF      |   ______      |                  |
+ *        | |            |            +--| 2.2k |-----+                  _
+ *         -             |            |   ------      |                 | |
+ *         |             |            = 100nF         |                 | | 100k
+ *         |             |            |               O                 |_|
+ *  GND ---+-------------+------------+      SquareWave 0.1 - 8MHz       |                                                     -
+ *                                                                       O
+ *                                                                External_Trigger
+ *
  *
  */
 
@@ -79,7 +120,7 @@
 /*
  * PIN
  * 2    External trigger input
- * 3    AC (low)/ DC (for attenuator)
+ * 3
  * 4    Attenuator range control (for active attenuator)
  * 5    Attenuator range control (for active attenuator)
  * 6    AC / DC relais (for active attenuator)
@@ -90,6 +131,8 @@
  * 11   Timer2  8 bit - Square wave for VEE (-5V) generation
  * 12   Not yet used
  * 13   Internal LED
+ *
+ * A5   AC bias - AC -> High impedance (input) / DC -> set as output LOW
  *
  * Timer0  8 bit - Arduino delay() and millis() functions
  *
@@ -107,40 +150,16 @@
 #include "PageFrequencyGenerator.h"
 
 #include "BlueDisplay.h"
-#include "utility/digitalWriteFast/digitalWriteFast.h"
-#define digitalToggleFast(P) BIT_SET(* &PINB, __digitalPinToBit(P))
+#include "digitalWriteFast.h"
 
 /**********************
  * Buttons
  *********************/
-BDButton TouchButtonSettingsPage;
-BDButton TouchButtonFrequencyPage;
+
 BDButton TouchButtonBack;
 // global flag for page control. Is evaluated by calling loop or page and set by buttonBack handler
 bool sBackButtonPressed;
 
-BDButton TouchButtonStartStop;
-
-BDButton TouchButtonTriggerMode;
-BDButton TouchButtonTriggerDelay;
-
-const char TriggerModeButtonStringAuto[] PROGMEM = "Trigger auto";
-const char TriggerModeButtonStringManualTimeout[] PROGMEM = "Trigger man t";
-const char TriggerModeButtonStringManual[] PROGMEM = "Trigger man";
-const char TriggerModeButtonStringFree[] PROGMEM = "Trigger free";
-const char TriggerModeButtonStringExtern[] PROGMEM = "Trigger ext";
-
-BDButton TouchButtonAutoOffsetOnOff;
-const char AutoOffsetButtonStringAuto[] PROGMEM = "Offset auto";
-const char AutoOffsetButtonString0[] PROGMEM = "Offset 0V";
-
-BDButton TouchButtonAutoRangeOnOff;
-const char AutoRangeButtonStringAuto[] PROGMEM = "Range auto";
-const char AutoRangeButtonStringManual[] PROGMEM = "Range man";
-
-BDButton TouchButtonADCReference;
-const char ReferenceButtonVCC[] PROGMEM = "Ref VCC";
-const char ReferenceButton1_1V[] PROGMEM = "Ref 1.1V";
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1284__) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega644__) || defined(__AVR_ATmega644A__) || defined(__AVR_ATmega644P__) || defined(__AVR_ATmega644PA__)
 //#define INTERNAL1V1 2
 #undef INTERNAL
@@ -149,42 +168,8 @@ const char ReferenceButton1_1V[] PROGMEM = "Ref 1.1V";
 #define INTERNAL 3
 #endif
 
-BDButton TouchButtonAcDc;
-const char AcDcButtonDC[] PROGMEM = "DC";
-const char AcDcButtonAC[] PROGMEM = "AC";
-
-BDButton TouchButtonChannels[NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR];
-BDButton TouchButtonChannelSelect;
-BDButton TouchButtonChannelMode;
-
 #define ADC_TEMPERATURE_CHANNEL 8
 #define ADC_1_1_VOLT_CHANNEL 0x0E
-char ChannelSelectButtonString[] = "Ch  ";
-#define CHANNEL_STRING_INDEX 3 // the index of the channel number in char array
-const char Channel3ButtonString[] PROGMEM = "Ch 3";
-
-const char ChannelDivBy1ButtonString[] PROGMEM = "\xF7" "1";
-const char ChannelDivBy10ButtonString[] PROGMEM = "\xF7" "10";
-const char ChannelDivBy100ButtonString[] PROGMEM = "\xF7" "100";
-const char * const ChannelDivByButtonStrings[] = { ChannelDivBy1ButtonString, ChannelDivBy10ButtonString,
-        ChannelDivBy100ButtonString };
-
-BDButton TouchButtonBack_Singleshot;
-#define SINGLESHOT_PPRINT_VALUE_X (37 * TEXT_SIZE_11_WIDTH)
-
-BDButton TouchButtonChartHistoryOnOff;
-
-/*
- * Slider for trigger level and voltage picker
- */
-BDSlider TouchSliderTriggerLevel;
-
-BDSlider TouchSliderVoltagePicker;
-uint8_t LastPickerValue;
-
-
-
-
 
 // for 31 grid
 const uint16_t TimebaseDivPrintValues[TIMEBASE_NUMBER_OF_ENTRIES] PROGMEM = { 10, 20, 50, 101, 201, 496, 1, 2, 5, 10, 20, 50, 100,
@@ -219,7 +204,6 @@ PRESCALE16 /*496us*/, PRESCALE32, PRESCALE64 /*2ms*/};
  * Automatic triggering and range stuff
  */
 #define TRIGGER_WAIT_NUMBER_OF_SAMPLES 3300 // Number of samples (<=112us) used for detecting the trigger condition
-#define TRIGGER_HYSTERESIS_MANUAL 2 // value for effective trigger hysteresis in manual trigger mode
 #define ADC_CYCLES_PER_CONVERSION 13
 #define SCALE_CHANGE_DELAY_MILLIS 2000
 
@@ -252,18 +236,13 @@ union Myword {
     uint8_t * BytePointer;
 };
 
-// if max value > DISPLAY_HEIGHT the ValueShift is incremented
-#define DISPLAY_VALUE_FOR_ZERO (REMOTE_DISPLAY_HEIGHT - 1)
-
 /***********************
  *   Loop control
  ***********************/
 // last sample of millis() in loop as reference for loop duration
 uint32_t sMillisLastLoop = 0;
-uint16_t sMillisSinceLastInfoOutput = 0;
+unsigned int sMillisSinceLastInfoOutput = 0;
 #define MILLIS_BETWEEN_INFO_OUTPUT 1000
-
-bool sShowWelcomeOnce;
 
 /***************
  * Debug stuff
@@ -305,86 +284,36 @@ DataBufferStruct DataBufferControl __attribute__((section(".noinit")));
 /*******************************************************************************************
  * Function declaration section
  *******************************************************************************************/
-// Measurement section
-void startAcquisition(void);
+
 void acquireDataFast(void);
 
 // Measurement auto control stuff (trigger, range + offset)
 void computeAutoTrigger(void);
-void setTriggerLevelAndHysteresis(int aRawTriggerValue, int aRawTriggerHysteresis);
 void setInputRange(uint8_t aShiftValue, uint8_t aActiveAttenuatorValue);
-bool changeRange(int8_t aChangeAmount);
 bool checkRAWValuesForClippingAndChangeRange(void);
 void computeAutoRange(void);
 void computeAutoOffset(void);
-void resetOffset(void);
-void setOffsetAutomatic(bool aNewState);
 
 // Attenuator support stuff
 void setAttenuator(uint8_t aNewValue);
-void setACMode(bool aNewMode);
 uint16_t getAttenuatorFactor(void);
 
 // GUI initialization and drawing stuff
-void createGUI(void);
-void drawStartGui(void);
-void drawDSOSettingsPage(void);
-void activatePartOfGui(void);
-
-
-// GUI handler section
-void doTouchUp(struct TouchEvent * const aTochPosition);
-void doLongTouchDown(struct TouchEvent * const aTochPosition);
-void doSwipeEnd(struct Swipe * const aSwipeInfo);
+void initDSOGUI(void);
+void activateChartGui(void);
 
 // BUTTON handler section
-void doAcDcMode(BDButton * aTheTouchedButton, int16_t aValue);
-
-void doPromptForTriggerDelay(BDButton * aTheTouchedButton, int16_t aValue);
-void doAutoOffsetOnOff(BDButton * aTheTouchedButton, int16_t aValue);
-void doADCReference(BDButton * aTheTouchedButton, int16_t aValue);
-void doChannelSelect(BDButton * aTheTouchedButton, int16_t aValue);
-void doTriggerSingleshot(BDButton * aTheTouchedButton, int16_t aValue);
-void doStartStop(BDButton * aTheTouchedButton, int16_t aValue);
-void doShowFrequencyPage(BDButton * aTheTouchedButton, int16_t aValue);
-void doShowSettingsPage(BDButton * aTheTouchedButton, int16_t aValue);
-void doTriggerLevel(BDSlider * aTheTouchedSlider, uint16_t aValue);
-void doVoltagePicker(BDSlider * aTheTouchedSlider, uint16_t aValue);
-
-// Button caption section
-void setChannelButtonsCaption(void);
-void setReferenceButtonCaption(void);
-void setACModeButtonCaption(void);
-void setTriggerDelayCaption(void);
-void setAutoOffsetButtonCaption(void);
-void setSlopeButtonCaption(void);
 
 // Graphical output section
-bool scrollChart(int8_t aScrollAmount);
-void clearHorizontalGridLinesAndHorizontalLineLabels(void);
-void drawMinMaxLines(void);
-void drawDataBuffer(uint8_t *aByteBuffer, uint16_t aColor, uint16_t aClearBeforeColor);
 void clearDisplayedChart(uint8_t * aDisplayBufferPtr);
 void drawRemainingDataBufferValues(void);
-
-// Text output section
-void printVCCAndTemperature(void);
-void clearInfo(uint8_t aOldMode);
-void printInfo(void);
-void printfTriggerDelay(char * aDataBufferPtr, uint16_t aTriggerDelayMillisOrMicros);
 
 //Hardware support section
 float getTemperature(void);
 void setVCCValue(void);
-void setChannel(uint8_t aChannel, bool doGui);
 inline void setPrescaleFactor(uint8_t aFactor);
 void setReference(uint8_t aReference);
 void initTimer2(void);
-
-// Stack info
-void initStackFreeMeasurement(void);
-uint16_t getStackFreeMinimumBytes(void);
-void printFreeStack(void);
 
 /*******************************************************************************************
  * Program code starts here
@@ -399,39 +328,40 @@ void initDisplay(void) {
     BlueDisplay1.setFlagsAndSize(
             BD_FLAG_FIRST_RESET_ALL | BD_FLAG_USE_MAX_SIZE | BD_FLAG_LONG_TOUCH_ENABLE | BD_FLAG_ONLY_TOUCH_MOVE_DISABLE,
             REMOTE_DISPLAY_WIDTH, REMOTE_DISPLAY_HEIGHT);
-    BlueDisplay1.setCharacterMapping(0xD1, 0x21D1); // Ascending in UTF16
-    BlueDisplay1.setCharacterMapping(0xD2, 0x21D3); // Descending in UTF16
+    BlueDisplay1.setCharacterMapping(0xD1, 0x21D1); // Ascending in UTF16 - for printInfo()
+    BlueDisplay1.setCharacterMapping(0xD2, 0x21D3); // Descending in UTF16 - for printInfo()
+    BlueDisplay1.setCharacterMapping(0xD4, 0x2227); // UP (logical AND) in UTF16
+    BlueDisplay1.setCharacterMapping(0xD5, 0x2228); // Down (logical OR) in UTF16
     //    BlueDisplay1.setCharacterMapping(0xF8, 0x2103); // Degree Celsius in UTF16
-    BlueDisplay1.setButtonsTouchTone(TONE_PROP_BEEP, 80);
-    createGUI();
+    //BlueDisplay1.setButtonsTouchTone(TONE_PROP_BEEP_OK, 80);
+    initDSOGUI();
     initFrequencyGeneratorPage();
-    if (DisplayControl.DisplayPage == DISPLAY_PAGE_START) {
-        sShowWelcomeOnce = true;
-    }
 }
 
 void setup() {
+    // Set outputs at port D
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1284__) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega644__) || defined(__AVR_ATmega644A__) || defined(__AVR_ATmega644P__) || defined(__AVR_ATmega644PA__) || defined(ARDUINO_AVR_LEONARDO) || defined(__AVR_ATmega16U4__) || defined(__AVR_ATmega32U4__)
     pinMode(ATTENUATOR_0_PIN, OUTPUT);
     pinMode(ATTENUATOR_1_PIN, OUTPUT);
     pinMode(AC_DC_RELAIS_PIN_1, OUTPUT);
     pinMode(AC_DC_RELAIS_PIN_2, OUTPUT);
 #else
-    DDRD = (DDRD & ~CONTROL_MASK) | CONTROL_MASK;
+    DDRD = (DDRD & ~OUTPUT_MASK_PORTD) | OUTPUT_MASK_PORTD;
 #endif
-    pinMode(AC_DC_PIN, INPUT_PULLUP);
+    // Set outputs at port B
     //    pinMode(TIMER_1_OUTPUT_PIN, OUTPUT);
     //    pinMode(VEE_PIN, OUTPUT);
+    // 2 pinMode replaced by:
     DDRB = (DDRB & ~OUTPUT_MASK_PORTB) | OUTPUT_MASK_PORTB;
     pinMode(ATTENUATOR_DETECT_PIN_0, INPUT_PULLUP);
     pinMode(ATTENUATOR_DETECT_PIN_1, INPUT_PULLUP);
 #ifdef DEBUG
     pinMode(DEBUG_PIN, OUTPUT);
 #endif
-    MeasurementControl.ACModeFromISR = 2;
-    // Enable pin change interrupt for AC/CD switch
-    PCMSK2 = (1 << PCINT19);
-    PCICR = (1 << PCIE2);
+    // Set outputs at port C
+    // For DC mode, change AC_DC_BIAS_PIN pin to output and set bias to 0V
+    DDRC = OUTPUT_MASK_PORTC;
+    digitalWriteFast(AC_DC_BIAS_PIN, LOW);
 
     // Shutdown SPI and TWI, enable all timers, USART and ADC
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1284__) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega644__) || defined(__AVR_ATmega644A__) || defined(__AVR_ATmega644P__) || defined(__AVR_ATmega644PA__) || defined(ARDUINO_AVR_LEONARDO) || defined(__AVR_ATmega16U4__) || defined(__AVR_ATmega32U4__)
@@ -451,7 +381,7 @@ void setup() {
     MeasurementControl.isSingleShotMode = false;
 
     MeasurementControl.TimebaseIndex = 0;
-    changeTimeBaseValue(TIMEBASE_INDEX_START_VALUE, false);
+    changeTimeBaseValue(TIMEBASE_INDEX_START_VALUE);
     /*
      * changeTimeBaseValue() needs:
      * TimebaseIndex
@@ -467,9 +397,11 @@ void setup() {
 
     MeasurementControl.ChannelHasActiveAttenuator = false;
     MeasurementControl.AttenuatorValue = 0; // set direct input as default
+    // read type of attached attenuator from 2 external connected pins
     uint8_t tAttenuatorType = !digitalReadFast(ATTENUATOR_DETECT_PIN_0);
     tAttenuatorType |= (!digitalReadFast(ATTENUATOR_DETECT_PIN_1)) << 1;
     MeasurementControl.AttenuatorType = tAttenuatorType;
+
     uint8_t tStartChannel = 0;
     if (tAttenuatorType == ATTENUATOR_TYPE_FIXED_ATTENUATOR) {
         tStartChannel = 1;
@@ -480,7 +412,7 @@ void setup() {
     delay(100);
     setVCCValue();
 
-    setChannel(tStartChannel, false);
+    setChannel(tStartChannel);
     /*
      * setChannel() needs:
      * AttenuatorType
@@ -505,7 +437,7 @@ void setup() {
      */
 
     MeasurementControl.RangeAutomatic = true;
-    MeasurementControl.OffsetAutomatic = false;
+    MeasurementControl.OffsetMode = OFFSET_MODE_0_VOLT;
 
     DataBufferControl.DataBufferDisplayStart = &DataBufferControl.DataBuffer[0];
 
@@ -514,21 +446,22 @@ void setup() {
     DisplayControl.DisplayPage = DISPLAY_PAGE_START;
     DisplayControl.showInfoMode = INFO_MODE_SHORT_INFO;
 
-    setACMode(!digitalReadFast(AC_DC_PIN));
+    //setACMode(!digitalReadFast(AC_DC_PIN));
     initFrequencyGenerator();
 
     // Register callback handler and check for connection
-    BlueDisplay1.initCommunication(&initDisplay, NULL, &redrawDisplay);
-    registerSwipeEndCallback(&doSwipeEnd);
+    BlueDisplay1.initCommunication(&initDisplay, &redrawDisplay);
+    registerSwipeEndCallback(&doSwipeEndDSO);
     registerTouchUpCallback(&doTouchUp);
-    registerLongTouchDownCallback(&doLongTouchDown, 900);
+    registerLongTouchDownCallback(&doLongTouchDownDSO, 900);
 
-    BlueDisplay1.playFeedbackTone(false);
+    BlueDisplay1.playFeedbackTone(FEEDBACK_TONE_OK);
     delay(400);
     setVCCValue();
-    BlueDisplay1.playFeedbackTone(false);
+    BlueDisplay1.playFeedbackTone(FEEDBACK_TONE_OK);
 
     initStackFreeMeasurement();
+
 }
 
 /************************************************************************
@@ -540,6 +473,7 @@ void __attribute__((noreturn)) loop(void) {
     bool sDoInfoOutput = true; // quasi static since we never leave the loop
 
     for (;;) {
+        checkAndHandleEvents();
         if (BlueDisplay1.mConnectionEstablished) {
             tMillis = millis();
             tMillisOfLoop = tMillis - sMillisLastLoop;
@@ -598,7 +532,6 @@ void __attribute__((noreturn)) loop(void) {
                             BlueDisplay1.drawChar(INFO_LEFT_MARGIN + SINGLESHOT_PPRINT_VALUE_X,
                             INFO_UPPER_MARGIN + TEXT_SIZE_11_HEIGHT, ' ', TEXT_SIZE_11, COLOR_BLACK, COLOR_BACKGROUND_DSO);
                         }
-                        //DisplayControl.showInfoMode = INFO_MODE_SHORT_INFO;
                         redrawDisplay();
                     } else {
                         /*
@@ -609,8 +542,9 @@ void __attribute__((noreturn)) loop(void) {
                         computeAutoRange();
                         computeAutoOffset();
                         // handle trigger line
-                        DisplayControl.TriggerLevelDisplayValue = getDisplayFromRawValue(MeasurementControl.RawTriggerLevel);
-                        if (tLastTriggerDisplayValue != DisplayControl.TriggerLevelDisplayValue) {
+                        DisplayControl.TriggerLevelDisplayValue = getDisplayFromRawInputValue(MeasurementControl.RawTriggerLevel);
+                        if (tLastTriggerDisplayValue
+                                != DisplayControl.TriggerLevelDisplayValue&& DisplayControl.DisplayPage == DISPLAY_PAGE_CHART) {
                             clearTriggerLine(tLastTriggerDisplayValue);
                             drawTriggerLine();
                         }
@@ -708,18 +642,6 @@ void __attribute__((noreturn)) loop(void) {
             }
         } // BlueDisplay1.mConnectionEstablished
 
-        /*
-         * handle AC / DC request from ISR
-         */
-        if (MeasurementControl.ACModeFromISR < 2) {
-            setACMode(MeasurementControl.ACModeFromISR);
-            MeasurementControl.ACModeFromISR = 2;
-        }
-
-        /*
-         * GUI handling
-         */
-        checkAndHandleEvents();
     } // for(;;)
 }
 /* Main loop end */
@@ -810,11 +732,11 @@ void startAcquisition(void) {
  * ISR for external trigger input
  */
 ISR(INT0_vect) {
-    if (MeasurementControl.TriggerDelay != TRIGGER_DELAY_NONE) {
+    if (MeasurementControl.TriggerDelayMode != TRIGGER_DELAY_NONE) {
         /*
          * Delay
          */
-        if (MeasurementControl.TriggerDelay == TRIGGER_DELAY_MICROS) {
+        if (MeasurementControl.TriggerDelayMode == TRIGGER_DELAY_MICROS) {
             delayMicroseconds(MeasurementControl.TriggerDelayMillisOrMicros - TRIGGER_DELAY_MICROS_ISR_ADJUST_COUNT);
         } else {
             MeasurementControl.TriggerStatus = TRIGGER_STATUS_FOUND_AND_WAIT_FOR_DELAY;
@@ -918,7 +840,7 @@ void acquireDataFast(void) {
     /*
      * Only microseconds delay makes sense
      */
-    if (MeasurementControl.TriggerDelay == TRIGGER_DELAY_MICROS) {
+    if (MeasurementControl.TriggerDelayMode == TRIGGER_DELAY_MICROS) {
         delayMicroseconds(MeasurementControl.TriggerDelayMillisOrMicros - TRIGGER_DELAY_MICROS_POLLING_ADJUST_COUNT);
     }
     /*
@@ -979,7 +901,7 @@ void acquireDataFast(void) {
             tUValue = *DataPointerFast++;
             tUValue |= *DataPointerFast++ << 8;
         } else {
-            // get values from adc
+            // get values from ADC
             // wait for free running conversion to finish
             // ADCSRA here is E5
             while (bit_is_clear(ADCSRA, ADIF)) {
@@ -1105,7 +1027,7 @@ ISR(ADC_vect) {
 
             if (!tTriggerFound) {
                 if (MeasurementControl.TriggerMode == TRIGGER_MODE_MANUAL || MeasurementControl.isSingleShotMode
-                        || MeasurementControl.TriggerDelay != TRIGGER_DELAY_NONE) {
+                        || MeasurementControl.TriggerDelayMode != TRIGGER_DELAY_NONE) {
                     // no timeout for Manual Trigger or SingleShotMode or trigger delay mode -> return
                     MeasurementControl.ValueBeforeTrigger = tUValue.Word;
                     return;
@@ -1131,8 +1053,8 @@ ISR(ADC_vect) {
                 /*
                  * Trigger found, check for delay
                  */
-                if (MeasurementControl.TriggerDelay != TRIGGER_DELAY_NONE) {
-                    if (MeasurementControl.TriggerDelay == TRIGGER_DELAY_MICROS) {
+                if (MeasurementControl.TriggerDelayMode != TRIGGER_DELAY_NONE) {
+                    if (MeasurementControl.TriggerDelayMode == TRIGGER_DELAY_MICROS) {
                         ADCSRA &= ~(1 << ADIE); // disable ADC interrupt
 //                        ADCSRA |= (1 << ADIF); // clear ADC interrupts
                         TIMSK0 &= ~(1 << TOIE0); // disable timer0 interrupt to avoid jitter
@@ -1140,7 +1062,7 @@ ISR(ADC_vect) {
                         // enable RX interrupt for GUI, otherwise we could miss input bytes at long delays (eg.50000us)
                         uint16_t tDelayMicros = MeasurementControl.TriggerDelayMillisOrMicros;
                         // delayMicroseconds(tDelayMicros); substituted by code below, to avoid additional register pushes
-                        __asm__ __volatile__ (
+                        asm volatile (
                                 "1: sbiw %0,1" "\n\t" // 2 cycles
                                 "1: adiw %0,1" "\n\t"// 2 cycles
                                 "1: sbiw %0,1" "\n\t"// 2 cycles
@@ -1283,19 +1205,6 @@ ISR(ADC_vect) {
     }
 }
 
-/*
- * Pin change interrupt for AC/DC pin
- * Bouncing is around 250-1000 micro seconds
- */
-ISR(PCINT2_vect) {
-    delayMicroseconds(1000);
-    if (digitalReadFast(AC_DC_PIN) == 0) {
-        MeasurementControl.ACModeFromISR = 1;
-    } else {
-        MeasurementControl.ACModeFromISR = 0;
-    }
-}
-
 /***********************************************************************
  * Measurement auto control stuff (trigger, range + offset)
  ***********************************************************************/
@@ -1315,8 +1224,9 @@ void setInputRange(uint8_t aShiftValue, uint8_t aActiveAttenuatorValue) {
     }
     resetOffset();
 
-    if (MeasurementControl.isRunning) {
-        clearHorizontalGridLinesAndHorizontalLineLabels();
+    if (MeasurementControl.isRunning && DisplayControl.DisplayPage == DISPLAY_PAGE_CHART) {
+        //clear old grid, since it will be changed
+        BlueDisplay1.clearDisplay(COLOR_BACKGROUND_DSO);
     }
     float tNewGridVoltage;
     uint16_t tHorizontalGridSizeShift8;
@@ -1358,8 +1268,8 @@ void setInputRange(uint8_t aShiftValue, uint8_t aActiveAttenuatorValue) {
  * used by swipe handler
  * input Range is ShiftValue + 3 * AttenuatorValue
  */
-bool changeRange(int8_t aChangeAmount) {
-    bool isError = false;
+uint8_t changeRange(int8_t aChangeAmount) {
+    uint8_t tFeedbackType = FEEDBACK_TONE_OK;
     int8_t tNewValue = 0;
     if (MeasurementControl.AttenuatorType >= ATTENUATOR_TYPE_ACTIVE_ATTENUATOR) {
         tNewValue = MeasurementControl.AttenuatorValue * 3;
@@ -1367,21 +1277,21 @@ bool changeRange(int8_t aChangeAmount) {
     tNewValue += MeasurementControl.ShiftValue + aChangeAmount;
     if (tNewValue < 0) {
         tNewValue = 0;
-        isError = true;
+        tFeedbackType = FEEDBACK_TONE_ERROR;
     }
     if (MeasurementControl.ChannelHasActiveAttenuator) {
         if (tNewValue > 8) {
             tNewValue = 8;
-            isError = true;
+            tFeedbackType = FEEDBACK_TONE_ERROR;
         }
     } else {
         if (tNewValue > 2) {
             tNewValue = 2;
-            isError = true;
+            tFeedbackType = FEEDBACK_TONE_ERROR;
         }
     }
     setInputRange(tNewValue % 3, tNewValue / 3);
-    return isError;
+    return tFeedbackType;
 }
 
 /*
@@ -1424,7 +1334,7 @@ void computeAutoRange(void) {
         }
         // since tPeakToPeak must fit in half of display
         tPeakToPeak *= 2;
-    } else if (MeasurementControl.OffsetAutomatic) {
+    } else if (MeasurementControl.OffsetMode == OFFSET_MODE_AUTOMATIC) {
         // Value min(display) is NOT fixed at zero
         tPeakToPeak -= MeasurementControl.RawValueMin;
     }
@@ -1478,7 +1388,7 @@ void computeAutoRange(void) {
  * compute offset based on center value in order display values at center of screen
  */
 void computeAutoOffset(void) {
-    if (!MeasurementControl.OffsetAutomatic) {
+    if (MeasurementControl.OffsetMode != OFFSET_MODE_AUTOMATIC) {
         return;
     }
     uint16_t tValueMiddleY = MeasurementControl.RawValueMin
@@ -1496,7 +1406,7 @@ void computeAutoOffset(void) {
     }
     if (abs(MeasurementControl.OffsetGridCount - tNumberOfGridLinesToSkip) > 1) {
         // avoid jitter by not changing number if its delta is only 1
-        clearHorizontalGridLinesAndHorizontalLineLabels();
+        BlueDisplay1.clearDisplay(COLOR_BACKGROUND_DSO);
         MeasurementControl.OffsetValue = tNumberOfGridLinesToSkip * tRawValuePerGrid;
         MeasurementControl.OffsetGridCount = tNumberOfGridLinesToSkip;
         drawGridLinesWithHorizLabelsAndTriggerLine();
@@ -1504,18 +1414,6 @@ void computeAutoOffset(void) {
         MeasurementControl.OffsetValue = 0;
         MeasurementControl.OffsetGridCount = 0;
     }
-}
-
-/*
- * sets offset and button caption
- */
-void setOffsetAutomatic(bool aNewState) {
-    if (!aNewState) {
-        // disable auto offset
-        MeasurementControl.OffsetValue = 0;
-    }
-    MeasurementControl.OffsetAutomatic = aNewState;
-    setAutoOffsetButtonCaption();
 }
 
 /*
@@ -1531,7 +1429,7 @@ void resetOffset(void) {
             tNewValueOffsetForACMode = 0;
         }
         MeasurementControl.OffsetValue = tNewValueOffsetForACMode;
-    } else if (!MeasurementControl.OffsetAutomatic) {
+    } else if (MeasurementControl.OffsetMode != OFFSET_MODE_AUTOMATIC) {
         MeasurementControl.OffsetValue = 0;
     }
 }
@@ -1548,377 +1446,14 @@ void setAttenuator(uint8_t aNewValue) {
     CONTROL_PORT = tPortValue;
 }
 
-/*
- * No AC mode for channels without attenuator
- */
-void setACMode(bool aNewMode) {
-    if (MeasurementControl.isRunning) {
-        clearHorizontalGridLinesAndHorizontalLineLabels();
-    }
-    MeasurementControl.isACMode = aNewMode;
-    MeasurementControl.ChannelIsACMode = aNewMode;
-    uint8_t tRelaisPin;
-    if (aNewMode) {
-        // no OffsetAutomatic for AC mode
-        setOffsetAutomatic(false);
-        tRelaisPin = AC_DC_RELAIS_PIN_1;
-    } else {
-        tRelaisPin = AC_DC_RELAIS_PIN_2;
-    }
-// change power latching relay state
-    digitalWriteFast(tRelaisPin, HIGH);
-
-// must do it here after settings of flags and before drawing
-    setACModeButtonCaption();
-    if (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS) {
-        // hide/show offset
-        drawDSOSettingsPage();
-    }
-    if (MeasurementControl.isRunning) {
-        drawGridLinesWithHorizLabelsAndTriggerLine();
-    }
-    resetOffset();
-
-// Wait for latching relay to switch - 2ms does not work reliable after reset, so take 4ms.
-    delay(4);
-// No need for relay power any more
-    digitalWriteFast(tRelaisPin, LOW);
-}
-
 uint16_t getAttenuatorFactor(void) {
     uint16_t tRetValue = 1;
-    if (MeasurementControl.ChannelHasACDCSwitch) {
-        for (int i = 0; i < MeasurementControl.AttenuatorValue; ++i) {
-            tRetValue *= ATTENUATOR_FACTOR;
-        }
+//    if (MeasurementControl.ChannelHasACDCSwitch) {
+    for (int i = 0; i < MeasurementControl.AttenuatorValue; ++i) {
+        tRetValue *= ATTENUATOR_FACTOR;
     }
+//    }
     return tRetValue;
-}
-
-/***********************************************************************
- * GUI initialization and drawing stuff
- ***********************************************************************/
-
-void createGUI(void) {
-    BlueDisplay1.setButtonsGlobalFlags(USE_UP_EVENTS_FOR_BUTTONS); // since swipe recognition needs it
-// Button for Singleshot (and settings/back)
-    TouchButtonBack_Singleshot.initPGM(BUTTON_WIDTH_3_POS_3, 0, BUTTON_WIDTH_3, BUTTON_HEIGHT_4_256,
-    COLOR_GUI_CONTROL, PSTR("Single"), TEXT_SIZE_11, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 0, &doTriggerSingleshot);
-
-    TouchButtonBack.initPGM(BUTTON_WIDTH_3_POS_3, 0, BUTTON_WIDTH_3, BUTTON_HEIGHT_4_256, COLOR_GUI_CONTROL, PSTR("Back"),
-    TEXT_SIZE_22, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 0, &doDefaultBackButton);
-
-// big start stop button
-    TouchButtonStartStop.initPGM(BUTTON_WIDTH_3_POS_3, BUTTON_HEIGHT_4_256_LINE_2, BUTTON_WIDTH_3,
-            (2 * BUTTON_HEIGHT_4_256) + BUTTON_DEFAULT_SPACING, COLOR_GUI_CONTROL, PSTR("Start/Stop"), TEXT_SIZE_11,
-            FLAG_BUTTON_DO_BEEP_ON_TOUCH, 0, &doStartStop);
-
-// Button for settings page
-    TouchButtonSettingsPage.initPGM(BUTTON_WIDTH_3_POS_3, BUTTON_HEIGHT_4_256_LINE_4, BUTTON_WIDTH_3,
-    BUTTON_HEIGHT_4_256, COLOR_GUI_CONTROL, PSTR("Settings"), TEXT_SIZE_11, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 0, &doShowSettingsPage);
-
-    /*
-     * Settings Page
-     * 1. column
-     */
-// Button for chart history (erase color)
-    TouchButtonChartHistoryOnOff.initPGM(0, 0, BUTTON_WIDTH_3, BUTTON_HEIGHT_4_256, COLOR_RED, PSTR("History"),
-    TEXT_SIZE_11, FLAG_BUTTON_DO_BEEP_ON_TOUCH | BUTTON_FLAG_TYPE_TOGGLE_RED_GREEN_MANUAL_REFRESH, 0, &doChartHistory);
-
-// Button for delay
-    TouchButtonTriggerDelay.init(0, BUTTON_HEIGHT_4_256_LINE_2, BUTTON_WIDTH_3, BUTTON_HEIGHT_4_256,
-    COLOR_GUI_TRIGGER, "", TEXT_SIZE_11, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 0, &doPromptForTriggerDelay);
-    setTriggerDelayCaption();
-
-// Button for AC / DC
-    TouchButtonAcDc.init(0, BUTTON_HEIGHT_4_256_LINE_3, BUTTON_WIDTH_3, BUTTON_HEIGHT_4_256,
-    COLOR_GUI_SOURCE_TIMEBASE, "", TEXT_SIZE_22, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 0, &doAcDcMode);
-    setACModeButtonCaption();
-
-// Button for selecting this page. To be displayed in parent page
-    TouchButtonFrequencyPage.initPGM(0, BUTTON_HEIGHT_4_256_LINE_4, BUTTON_WIDTH_3, BUTTON_HEIGHT_4_256, COLOR_RED,
-            PSTR("Frequency\nGenerator"), TEXT_SIZE_11, BUTTON_FLAG_DO_BEEP_ON_TOUCH, 0, &doShowFrequencyPage);
-
-    /*
-     * 2. column
-     */
-// Button for auto trigger on off
-    TouchButtonTriggerMode.init(BUTTON_WIDTH_3_POS_2, 0, BUTTON_WIDTH_3, BUTTON_HEIGHT_4_256,
-    COLOR_GUI_TRIGGER, "", TEXT_SIZE_11, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 0, &doTriggerMode);
-    setTriggerModeButtonCaption();
-
-// Button for slope
-    TouchButtonSlope.init(BUTTON_WIDTH_3_POS_2, BUTTON_HEIGHT_4_256_LINE_2, BUTTON_WIDTH_3, BUTTON_HEIGHT_4_256,
-    COLOR_GUI_TRIGGER, "", TEXT_SIZE_11, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 0, &doTriggerSlope);
-    setSlopeButtonCaption();
-
-// Button for range
-    TouchButtonAutoRangeOnOff.init(BUTTON_WIDTH_3_POS_2, BUTTON_HEIGHT_4_256_LINE_3, BUTTON_WIDTH_3,
-    BUTTON_HEIGHT_4_256, COLOR_GUI_TRIGGER, "", TEXT_SIZE_11, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 0, &doRangeMode);
-    setAutoRangeModeAndButtonCaption(true);
-
-// Button for auto offset on off
-    TouchButtonAutoOffsetOnOff.init(BUTTON_WIDTH_3_POS_2, BUTTON_HEIGHT_4_256_LINE_4, BUTTON_WIDTH_3,
-    BUTTON_HEIGHT_4_256, COLOR_GUI_TRIGGER, "", TEXT_SIZE_11, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 0, &doAutoOffsetOnOff);
-    setAutoOffsetButtonCaption();
-
-    /*
-     * 3. column
-     */
-// Button for channel 0
-    TouchButtonChannels[0].init(BUTTON_WIDTH_3_POS_3, BUTTON_HEIGHT_4_256_LINE_2, BUTTON_WIDTH_6,
-    BUTTON_HEIGHT_4_256, BUTTON_AUTO_RED_GREEN_FALSE_COLOR, "", TEXT_SIZE_11, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 0, &doChannelSelect);
-
-// Button for channel 1
-    TouchButtonChannels[1].init(REMOTE_DISPLAY_WIDTH - BUTTON_WIDTH_6, BUTTON_HEIGHT_4_256_LINE_2, BUTTON_WIDTH_6,
-    BUTTON_HEIGHT_4_256, BUTTON_AUTO_RED_GREEN_FALSE_COLOR, "", TEXT_SIZE_11, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 1, &doChannelSelect);
-
-// Button for channel 2
-    TouchButtonChannels[2].init(BUTTON_WIDTH_3_POS_3, BUTTON_HEIGHT_4_256_LINE_3, BUTTON_WIDTH_6,
-    BUTTON_HEIGHT_4_256, BUTTON_AUTO_RED_GREEN_FALSE_COLOR, "", TEXT_SIZE_11, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 2, &doChannelSelect);
-    setChannelButtonsCaption();
-
-// Button for channel select
-    TouchButtonChannelSelect.initPGM(REMOTE_DISPLAY_WIDTH - BUTTON_WIDTH_6, BUTTON_HEIGHT_4_256_LINE_3, BUTTON_WIDTH_6,
-    BUTTON_HEIGHT_4_256, BUTTON_AUTO_RED_GREEN_FALSE_COLOR, Channel3ButtonString, TEXT_SIZE_11, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 42,
-            &doChannelSelect);
-
-// Button for reference voltage switching
-    TouchButtonADCReference.init(BUTTON_WIDTH_3_POS_3, BUTTON_HEIGHT_4_256_LINE_4, BUTTON_WIDTH_3,
-    BUTTON_HEIGHT_4_256, COLOR_GUI_SOURCE_TIMEBASE, "", TEXT_SIZE_11, FLAG_BUTTON_DO_BEEP_ON_TOUCH, 0, &doADCReference);
-    setReferenceButtonCaption();
-
-    /*
-     * SLIDER
-     */
-// make slider slightly visible
-// slider for voltage picker
-    TouchSliderVoltagePicker.init(SLIDER_VPICKER_POS_X, 0, SLIDER_SIZE, REMOTE_DISPLAY_HEIGHT, REMOTE_DISPLAY_HEIGHT, 0, 0,
-    COLOR_DATA_PICKER_SLIDER, FLAG_SLIDER_VALUE_BY_CALLBACK, &doVoltagePicker);
-    TouchSliderVoltagePicker.setBarBackgroundColor(COLOR_DATA_PICKER_SLIDER);
-
-// slider for trigger level
-    TouchSliderTriggerLevel.init(SLIDER_TLEVEL_POS_X, 0, SLIDER_SIZE, REMOTE_DISPLAY_HEIGHT, REMOTE_DISPLAY_HEIGHT, 0, 0,
-    COLOR_TRIGGER_SLIDER, FLAG_SLIDER_VALUE_BY_CALLBACK, &doTriggerLevel);
-    TouchSliderTriggerLevel.setBarBackgroundColor( COLOR_TRIGGER_SLIDER);
-}
-
-void drawStartGui(void) {
-    DisplayControl.DisplayPage = DISPLAY_PAGE_START;
-    BlueDisplay1.clearDisplay(COLOR_BACKGROUND_DSO);
-    BlueDisplay1.deactivateAllButtons();
-    BlueDisplay1.deactivateAllSliders();
-
-    TouchButtonStartStop.drawButton();
-    TouchButtonBack_Singleshot.drawButton();
-    TouchButtonSettingsPage.drawButton();
-    if (sShowWelcomeOnce) {
-        BlueDisplay1.drawTextPGM(10, BUTTON_HEIGHT_4_LINE_2 + 32, PSTR("Welcome to\nArduino DSO"), 32, COLOR_BLUE,
-        COLOR_BACKGROUND_DSO);
-        BlueDisplay1.drawTextPGM(10, BUTTON_HEIGHT_4_LINE_2 + (3 * 32), PSTR("300 kSamples/s"), 22, COLOR_BLUE,
-        COLOR_BACKGROUND_DSO);
-        sShowWelcomeOnce = false;
-    }
-}
-
-void drawDSOSettingsPage(void) {
-    BlueDisplay1.clearDisplay(COLOR_BACKGROUND_DSO);
-
-    BlueDisplay1.deactivateAllButtons();
-    BlueDisplay1.deactivateAllSliders();
-
-    if (MeasurementControl.ChannelHasACDCSwitch) {
-        TouchButtonAcDc.drawButton();
-    }
-    TouchButtonTriggerMode.drawButton();
-    TouchButtonBack.drawButton();
-    TouchButtonSlope.drawButton();
-    TouchButtonTriggerDelay.drawButton();
-    TouchButtonAutoRangeOnOff.drawButton();
-    if (!MeasurementControl.ChannelIsACMode) {
-        TouchButtonAutoOffsetOnOff.drawButton();
-    }
-
-    /*
-     * Determine colors for channel buttons
-     */
-    int16_t tButtonColor;
-    for (uint8_t i = 0; i < NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR; ++i) {
-        if (i == MeasurementControl.ADCInputMUXChannel) {
-            tButtonColor = BUTTON_AUTO_RED_GREEN_TRUE_COLOR;
-        } else {
-            tButtonColor = BUTTON_AUTO_RED_GREEN_FALSE_COLOR;
-        }
-        TouchButtonChannels[i].setButtonColorAndDraw(tButtonColor);
-    }
-    if (MeasurementControl.ADCInputMUXChannel >= NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR) {
-        tButtonColor = BUTTON_AUTO_RED_GREEN_TRUE_COLOR;
-    } else {
-        tButtonColor = BUTTON_AUTO_RED_GREEN_FALSE_COLOR;
-    }
-    TouchButtonChannelSelect.setButtonColorAndDraw(tButtonColor);
-
-    TouchButtonADCReference.drawButton();
-    TouchButtonChartHistoryOnOff.drawButton();
-    TouchButtonFrequencyPage.drawButton();
-// print minimum stacksize and enable new stack measurement
-    printFreeStack();
-    initStackFreeMeasurement();
-}
-
-/*
- * activate elements if returning from settings screen or if starting acquisition
- */
-void activatePartOfGui(void) {
-// first deactivate all
-    BlueDisplay1.deactivateAllButtons();
-
-    TouchButtonStartStop.activate();
-    TouchButtonBack_Singleshot.activate();
-    TouchButtonSettingsPage.activate();
-    TouchButtonChartHistoryOnOff.activate();
-
-    TouchSliderVoltagePicker.drawSlider();
-    if (MeasurementControl.TriggerMode == TRIGGER_MODE_MANUAL_TIMEOUT || MeasurementControl.TriggerMode == TRIGGER_MODE_MANUAL) {
-        TouchSliderTriggerLevel.drawSlider();
-    }
-}
-
-void redrawDisplay() {
-    BlueDisplay1.clearDisplay(COLOR_BACKGROUND_DSO);
-    if (MeasurementControl.isRunning) {
-        /*
-         * running mode
-         */
-        if (DisplayControl.DisplayPage >= DISPLAY_PAGE_SETTINGS) {
-            drawDSOSettingsPage();
-        } else {
-            activatePartOfGui();
-            // refresh grid
-            drawGridLinesWithHorizLabelsAndTriggerLine();
-            printInfo();
-        }
-
-    } else {
-        /*
-         * analyze mode
-         */
-        if (DisplayControl.DisplayPage == DISPLAY_PAGE_START) {
-            drawStartGui();
-        } else if (DisplayControl.DisplayPage == DISPLAY_PAGE_CHART) {
-            activatePartOfGui();
-            drawGridLinesWithHorizLabelsAndTriggerLine();
-            drawMinMaxLines();
-            // draw from last scroll position
-            drawDataBuffer(DataBufferControl.DataBufferDisplayStart, COLOR_DATA_HOLD, DisplayControl.EraseColor);
-            printInfo();
-        } else if (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS) {
-            drawDSOSettingsPage();
-        }
-    }
-}
-
-/************************************************************************
- * GUI handler section
- ************************************************************************/
-/*
- * Handler for "empty" touch
- * Use touch up in order not to interfere with long touch
- * Switch between upper info line short/long/off
- */
-void doTouchUp(struct TouchEvent * const aTochPosition) {
-    if (DisplayControl.DisplayPage == DISPLAY_PAGE_CHART) {
-        // Wrap display mode
-        uint8_t tOldMode = DisplayControl.showInfoMode;
-        uint8_t tNewMode = tOldMode + 1;
-        if (tNewMode > INFO_MODE_LONG_INFO) {
-            tNewMode = INFO_MODE_NO_INFO;
-        }
-        DisplayControl.showInfoMode = tNewMode;
-        if (tNewMode == INFO_MODE_NO_INFO) {
-            if (MeasurementControl.isRunning) {
-                // erase former info line
-                clearInfo(tOldMode);
-            } else {
-                redrawDisplay();
-            }
-        } else {
-            // erase former info line
-            clearInfo(tOldMode);
-            printInfo();
-        }
-    }
-}
-
-/*
- * If stopped toggle between Start and Chart page
- * if running and Chart page show Settings page
- */
-void doLongTouchDown(struct TouchEvent * const aTochPosition) {
-    if (DisplayControl.DisplayPage == DISPLAY_PAGE_CHART) {
-        if (MeasurementControl.isRunning) {
-            // Show settings page
-            drawDSOSettingsPage();
-        } else {
-            // clear screen and show only gui
-            DisplayControl.DisplayPage = DISPLAY_PAGE_START;
-            redrawDisplay();
-        }
-    } else if (DisplayControl.DisplayPage == DISPLAY_PAGE_START) {
-        // only chart (and voltage picker)
-        DisplayControl.DisplayPage = DISPLAY_PAGE_CHART;
-        // flag to avoid initial clearing of (not existent) picker and trigger level lines
-        LastPickerValue = 0xFF;
-        redrawDisplay();
-    }
-}
-
-void doSwipeEnd(struct Swipe * const aSwipeInfo) {
-    bool isError = false;
-
-    if (aSwipeInfo->TouchDeltaAbsMax > 32) {
-        int8_t tTouchDeltaXGrid = aSwipeInfo->TouchDeltaX / 32;
-        if (MeasurementControl.isRunning) {
-            if (aSwipeInfo->SwipeMainDirectionIsX) {
-                /*
-                 * Timebase -> use tTouchDeltaXGrid/2
-                 */
-                tTouchDeltaXGrid /= 2;
-                if (tTouchDeltaXGrid == 0) {
-                    isError = true;
-                } else {
-                    isError = changeTimeBaseValue(-tTouchDeltaXGrid, true);
-                }
-            } else {
-                if (!MeasurementControl.RangeAutomatic) {
-                    /*
-                     * Range
-                     */
-                    isError = changeRange(aSwipeInfo->TouchDeltaY / 32);
-                } else {
-                    isError = true;
-                }
-            }
-        } else {
-            if (aSwipeInfo->SwipeMainDirectionIsX) {
-                //if (aSwipeInfo.TouchStartY > BUTTON_HEIGHT_4_256_LINE_3) {
-                /*
-                 * Scroll
-                 */
-                isError = scrollChart(-tTouchDeltaXGrid);
-                //                } else {
-                //                    /*
-                //                     * X-Scale
-                //                     */
-                //                }
-            } else {
-                isError = true;
-            }
-        }
-    } else {
-        isError = true;
-    }
-    BlueDisplay1.playFeedbackTone(isError);
 }
 
 /************************************************************************
@@ -1954,23 +1489,8 @@ void doSetTriggerDelay(float aValue) {
             }
         }
     }
-    MeasurementControl.TriggerDelay = tTriggerDelayMode;
+    MeasurementControl.TriggerDelayMode = tTriggerDelayMode;
     setTriggerDelayCaption();
-}
-
-/*
- * Request delay value as number
- */
-void doPromptForTriggerDelay(BDButton * aTheTouchedButton, int16_t aValue) {
-    BlueDisplay1.getNumberWithShortPromptPGM(&doSetTriggerDelay, PSTR("Trigger delay [\xB5s]"), NUMBER_INITIAL_VALUE_DO_NOT_SHOW);
-}
-
-/*
- * toggle between auto and 0 Volt offset
- * No auto offset in AC Mode
- */
-void doAutoOffsetOnOff(BDButton * aTheTouchedButton, int16_t aValue) {
-    setOffsetAutomatic(!MeasurementControl.OffsetAutomatic);
 }
 
 /*
@@ -1991,48 +1511,7 @@ void doADCReference(BDButton * aTheTouchedButton, int16_t aValue) {
     }
 }
 
-/*
- * Cycle through all external and internal adc channels
- */
-void doChannelSelect(BDButton * aTheTouchedButton, int16_t aValue) {
-    if (aValue > 20) {
-        // channel increment button here "Ch 3" etc.
-        uint8_t tOldValue = MeasurementControl.ADCInputMUXChannel;
-        // if channel 3 is not selected increment channel, otherwise select channel 3
-        if (tOldValue >= NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR) {
-            aValue = tOldValue + 1;
-        } else {
-            aValue = NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR;
-        }
-    }
-    setChannel(aValue, true);
-}
-
-/*
- * set to singleshot mode and draw an indicating "S"
- */
-void doTriggerSingleshot(BDButton * aTheTouchedButton, int16_t aValue) {
-    MeasurementControl.isSingleShotMode = true;
-    BlueDisplay1.clearDisplay(COLOR_BACKGROUND_DSO);
-    DisplayControl.DisplayPage = DISPLAY_PAGE_CHART;
-    DataBufferControl.DataBufferDisplayStart = &DataBufferControl.DataBuffer[0];
-
-    drawGridLinesWithHorizLabelsAndTriggerLine();
-// draw an S to indicate running single shot trigger
-    BlueDisplay1.drawChar(INFO_LEFT_MARGIN + SINGLESHOT_PPRINT_VALUE_X, INFO_UPPER_MARGIN + TEXT_SIZE_11_HEIGHT, 'S', TEXT_SIZE_11,
-    COLOR_BLACK, COLOR_INFO_BACKGROUND);
-
-// prepare info output - at least 1 sec later
-    sMillisSinceLastInfoOutput = 0;
-    MeasurementControl.RawValueMax = 0;
-    MeasurementControl.RawValueMin = 0;
-
-// Start a new single shot
-    startAcquisition();
-    MeasurementControl.isRunning = true;
-}
-
-void doStartStop(BDButton * aTheTouchedButton, int16_t aValue) {
+void doStartStopDSO(BDButton * aTheTouchedButton, int16_t aValue) {
     if (MeasurementControl.isRunning) {
         /*
          * Stop here
@@ -2069,197 +1548,18 @@ void doStartStop(BDButton * aTheTouchedButton, int16_t aValue) {
         DataBufferControl.DataBufferDisplayStart = &DataBufferControl.DataBuffer[0];
         // no feedback tone, it kills the timing!
     } else {
-        // Start here
+        /*
+         * Start here
+         */
         BlueDisplay1.clearDisplay(COLOR_BACKGROUND_DSO);
         DisplayControl.DisplayPage = DISPLAY_PAGE_CHART;
         //DisplayControl.showInfoMode = true;
-        activatePartOfGui();
+        activateChartGui();
         drawGridLinesWithHorizLabelsAndTriggerLine();
         MeasurementControl.isSingleShotMode = false;
         startAcquisition();
         MeasurementControl.isRunning = true;
     }
-}
-
-// TODO we have a lot of duplicate code here and in printInfo()
-void PrintTriggerInfo(void) {
-    float tVoltage;
-    float tRefMultiplier;
-    if (MeasurementControl.ChannelHasActiveAttenuator) {
-        tRefMultiplier = 2.0 / 1.1;
-    } else {
-        tRefMultiplier = 1;
-    }
-    if (MeasurementControl.ADCReference == DEFAULT) {
-        tRefMultiplier *= MeasurementControl.VCC / 1024.0;
-        /*
-         * Use 1023 to get 5V display for full scale reading
-         * Better would be 5.0 / 1024.0; since the reading for value for 5V- 1LSB is also 1023,
-         * but this implies that the maximum displayed value is 4.99(51171875) :-(
-         */
-    } else {
-        tRefMultiplier *= 1.1 / 1024.0;
-    }
-    tRefMultiplier *= getAttenuatorFactor();
-
-    int16_t tACOffset = 0;
-    if (MeasurementControl.ChannelIsACMode) {
-        tACOffset = MeasurementControl.RawDSOReadingACZero;
-    }
-    tVoltage = ((int16_t) MeasurementControl.RawTriggerLevel - tACOffset);
-
-    tVoltage = tRefMultiplier * tVoltage;
-    uint8_t tPrecision = 2 - MeasurementControl.AttenuatorValue;
-    dtostrf(tVoltage, 5, tPrecision, sStringBuffer);
-    sStringBuffer[5] = 'V';
-    sStringBuffer[6] = '\0';
-
-    uint8_t tYPos = TRIGGER_LEVEL_INFO_SHORT_Y;
-    uint16_t tXPos = TRIGGER_LEVEL_INFO_SHORT_X;
-    uint8_t tFontsize = FONT_SIZE_INFO_SHORT;
-    if (DisplayControl.showInfoMode == INFO_MODE_LONG_INFO) {
-        tXPos = TRIGGER_LEVEL_INFO_LONG_X;
-        tYPos = TRIGGER_LEVEL_INFO_LONG_Y;
-        tFontsize = FONT_SIZE_INFO_LONG;
-    }
-    BlueDisplay1.drawText(tXPos, tYPos, sStringBuffer, tFontsize, COLOR_BLACK, COLOR_INFO_BACKGROUND);
-}
-
-/*
- * The value printed has a resolution of 0,00488 * scale factor
- */
-void doTriggerLevel(BDSlider * aTheTouchedSlider, uint16_t aValue) {
-// in auto-trigger mode show only computed value and do not modify it
-    if (MeasurementControl.TriggerMode != TRIGGER_MODE_MANUAL_TIMEOUT && MeasurementControl.TriggerMode != TRIGGER_MODE_MANUAL) {
-        // already shown :-)
-        return;
-    }
-// to get display value take -aValue and vice versa
-    aValue = DISPLAY_VALUE_FOR_ZERO - aValue;
-    if (DisplayControl.TriggerLevelDisplayValue == aValue) {
-        return;
-    }
-
-// clear old trigger line
-    clearTriggerLine(DisplayControl.TriggerLevelDisplayValue);
-// store actual display value
-    DisplayControl.TriggerLevelDisplayValue = aValue;
-
-// modify trigger values
-    uint16_t tLevel = getRawFromDisplayValue(aValue);
-    setTriggerLevelAndHysteresis(tLevel, TRIGGER_HYSTERESIS_MANUAL);
-
-// draw new line
-    drawTriggerLine();
-    PrintTriggerInfo();
-}
-
-/*
- * The value printed has a resolution of 0,00488 * scale factor
- */
-void doVoltagePicker(BDSlider * aTheTouchedSlider, uint16_t aValue) {
-    char tVoltageBuffer[6];
-    if (LastPickerValue == aValue) {
-        return;
-    }
-    if (LastPickerValue != 0xFF) {
-        // clear old line
-        uint16_t tYpos = DISPLAY_VALUE_FOR_ZERO - LastPickerValue;
-        BlueDisplay1.drawLineRel(0, tYpos, REMOTE_DISPLAY_WIDTH, 0, COLOR_BACKGROUND_DSO);
-        // restore grid at old y position
-        for (uint16_t tXPos = TIMING_GRID_WIDTH - 1; tXPos < REMOTE_DISPLAY_WIDTH - 1; tXPos += TIMING_GRID_WIDTH) {
-            BlueDisplay1.drawPixel(tXPos, tYpos, COLOR_GRID_LINES);
-        }
-    }
-// draw new line
-    uint8_t tValue = DISPLAY_VALUE_FOR_ZERO - aValue;
-    BlueDisplay1.drawLineRel(0, tValue, REMOTE_DISPLAY_WIDTH, 0, COLOR_DATA_PICKER);
-    LastPickerValue = aValue;
-
-    float tVoltage = getFloatFromDisplayValue(tValue);
-    dtostrf(tVoltage, 4, 2, tVoltageBuffer);
-    tVoltageBuffer[4] = 'V';
-    tVoltageBuffer[5] = '\0';
-
-    uint16_t tYPos = SLIDER_VPICKER_INFO_SHORT_Y;
-    if (DisplayControl.showInfoMode == INFO_MODE_LONG_INFO) {
-        tYPos = SLIDER_VPICKER_INFO_LONG_Y;
-    }
-// print value
-    BlueDisplay1.drawText(SLIDER_VPICKER_INFO_X, tYPos, tVoltageBuffer, FONT_SIZE_INFO_SHORT, COLOR_BLACK,
-    COLOR_INFO_BACKGROUND);
-}
-
-void doShowFrequencyPage(BDButton * aTheTouchedButton, int16_t aValue) {
-    DisplayControl.DisplayPage = DISPLAY_PAGE_FREQUENCY;
-    startFrequencyGeneratorPage();
-}
-
-void doShowSettingsPage(BDButton * aTheTouchedButton, int16_t aValue) {
-    DisplayControl.DisplayPage = DISPLAY_PAGE_SETTINGS;
-    drawDSOSettingsPage();
-}
-
-/*
- * default handle for back button
- */
-void doDefaultBackButton(BDButton * aTheTouchedButton, int16_t aValue) {
-    sBackButtonPressed = true;
-}
-
-/************************************************************************
- * Button caption section
- ************************************************************************/
-
-void setChannelButtonsCaption(void) {
-    for (uint8_t i = 0; i < NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR; ++i) {
-        if (MeasurementControl.AttenuatorType == ATTENUATOR_TYPE_FIXED_ATTENUATOR) {
-            TouchButtonChannels[i].setCaptionPGM(ChannelDivByButtonStrings[i],
-                    (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS));
-        } else {
-            ChannelSelectButtonString[CHANNEL_STRING_INDEX] = 0x30 + i;
-            TouchButtonChannels[i].setCaption(ChannelSelectButtonString, (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS));
-        }
-    }
-}
-
-void setReferenceButtonCaption(void) {
-    const char * tCaption;
-    if (MeasurementControl.ADCReference == DEFAULT) {
-        tCaption = ReferenceButtonVCC;
-    } else {
-        tCaption = ReferenceButton1_1V;
-    }
-    TouchButtonADCReference.setCaptionPGM(tCaption, (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS));
-}
-
-void setACModeButtonCaption(void) {
-    const char * tCaption;
-    if (MeasurementControl.ChannelIsACMode) {
-        tCaption = AcDcButtonAC;
-    } else {
-        tCaption = AcDcButtonDC;
-    }
-    TouchButtonAcDc.setCaptionPGM(tCaption); // do not draw, since complete page is drawn after setting
-}
-
-void setTriggerDelayCaption(void) {
-    strcpy_P(&sStringBuffer[20], PSTR("Trigger delay\n"));
-    if (MeasurementControl.TriggerDelay != TRIGGER_DELAY_NONE) {
-        printfTriggerDelay(&sStringBuffer[34], MeasurementControl.TriggerDelayMillisOrMicros);
-    }
-    sprintf(sStringBuffer, &sStringBuffer[20], MeasurementControl.TriggerDelayMillisOrMicros);
-    TouchButtonTriggerDelay.setCaption(sStringBuffer, (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS));
-}
-
-void setAutoOffsetButtonCaption(void) {
-    const char * tCaption;
-    if (MeasurementControl.OffsetAutomatic) {
-        tCaption = AutoOffsetButtonStringAuto;
-    } else {
-        tCaption = AutoOffsetButtonString0;
-    }
-    TouchButtonAutoOffsetOnOff.setCaptionPGM(tCaption, (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS));
 }
 
 /************************************************************************
@@ -2268,7 +1568,7 @@ void setAutoOffsetButtonCaption(void) {
 /*
  * returns false if display was scrolled
  */
-bool scrollChart(int8_t aScrollAmount) {
+uint8_t scrollChart(int aScrollAmount) {
     if (DisplayControl.DisplayPage != DISPLAY_PAGE_CHART) {
         return true;
     }
@@ -2276,7 +1576,7 @@ bool scrollChart(int8_t aScrollAmount) {
     /*
      * set start of display in data buffer
      */
-    DataBufferControl.DataBufferDisplayStart += aScrollAmount * TIMING_GRID_WIDTH / DisplayControl.XScale;
+    DataBufferControl.DataBufferDisplayStart += aScrollAmount / DisplayControl.XScale;
 // check against begin of buffer
     if (DataBufferControl.DataBufferDisplayStart < &DataBufferControl.DataBuffer[0]) {
         DataBufferControl.DataBufferDisplayStart = &DataBufferControl.DataBuffer[0];
@@ -2296,30 +1596,6 @@ bool scrollChart(int8_t aScrollAmount) {
     drawDataBuffer(DataBufferControl.DataBufferDisplayStart, COLOR_DATA_HOLD, COLOR_BACKGROUND_DSO);
 
     return isError;
-}
-
-
-void clearHorizontalGridLinesAndHorizontalLineLabels(void) {
-    if (DisplayControl.DisplayPage == DISPLAY_PAGE_CHART) {
-        BlueDisplay1.clearDisplay(COLOR_BACKGROUND_DSO);
-        printInfo();
-    }
-}
-
-/*
- * draws min, max lines
- */
-void drawMinMaxLines(void) {
-// draw max line
-    uint8_t tValueDisplay = getDisplayFromRawValue(MeasurementControl.RawValueMax);
-    if (tValueDisplay != 0) {
-        BlueDisplay1.drawLineRel(0, tValueDisplay, REMOTE_DISPLAY_WIDTH, 0, COLOR_MAX_MIN_LINE);
-    }
-// min line
-    tValueDisplay = getDisplayFromRawValue(MeasurementControl.RawValueMin);
-    if (tValueDisplay != DISPLAY_VALUE_FOR_ZERO) {
-        BlueDisplay1.drawLineRel(0, tValueDisplay, REMOTE_DISPLAY_WIDTH, 0, COLOR_MAX_MIN_LINE);
-    }
 }
 
 void drawDataBuffer(uint8_t *aByteBuffer, uint16_t aColor, uint16_t aClearBeforeColor) {
@@ -2403,23 +1679,11 @@ void formatThousandSeparator(char * aThousandPosition) {
         tOldChar = tNewChar;
     }
 }
-/*
- * clear info line
- */
-void clearInfo(uint8_t aOldMode) {
-// +1 because I have seen artifacts otherwise
-    uint8_t tHeight = FONT_SIZE_INFO_SHORT + 1;
-    if (aOldMode == INFO_MODE_LONG_INFO) {
-        tHeight = (2 * FONT_SIZE_INFO_LONG) + 1;
-    }
-    BlueDisplay1.fillRectRel(INFO_LEFT_MARGIN, 0, REMOTE_DISPLAY_WIDTH, tHeight, COLOR_BACKGROUND_DSO);
-}
 
 /*
  * prints a period to a 9 character string and sets the thousand separator
  */
 void printfMicrosPeriod(char * aDataBufferPtr, uint32_t aPeriod) {
-
     char tPeriodUnitChar;
     uint16_t tPeriod;
     if (aPeriod >= 50000l) {
@@ -2435,10 +1699,12 @@ void printfMicrosPeriod(char * aDataBufferPtr, uint32_t aPeriod) {
     }
 }
 
+/*
+ * prints TriggerDelayMillisOrMicros with right unit according to TriggerDelayMode to a character string and sets the thousand separator
+ */
 void printfTriggerDelay(char * aDataBufferPtr, uint16_t aTriggerDelayMillisOrMicros) {
-
     char tPeriodUnitChar;
-    if (MeasurementControl.TriggerDelay == TRIGGER_DELAY_MILLIS) {
+    if (MeasurementControl.TriggerDelayMode == TRIGGER_DELAY_MILLIS) {
         tPeriodUnitChar = 'm'; // milli
     } else {
         tPeriodUnitChar = '\xB5'; // micro
@@ -2471,9 +1737,9 @@ void printInfo(void) {
     float tVoltage;
 
     if (MeasurementControl.TriggerSlopeRising) {
-        tSlopeChar = '\xD1';
+        tSlopeChar = 0xD1; //ascending
     } else {
-        tSlopeChar = '\xD2';
+        tSlopeChar = 0xD2; //Descending
     }
 
     if (MeasurementControl.ChannelHasActiveAttenuator) {
@@ -2526,23 +1792,21 @@ void printInfo(void) {
     }
     tTimebaseUnitsPerGrid = pgm_read_word(&TimebaseDivPrintValues[MeasurementControl.TimebaseIndex]);
 
-    /*
-     * Period and frequency
-     */
     uint32_t tHertz = MeasurementControl.FrequencyHertz;
 
     if (DisplayControl.showInfoMode == INFO_MODE_LONG_INFO) {
         /*
-         * Long version
+         * Long version 1. line Timebase, Channel, (min, average, max, peak to peak) Voltage, Trigger, Reference.
          */
-        sprintf_P(sStringBuffer, PSTR("%3u%cs %c Ch%c %s %s %s P2P%sV %sV %c"), tTimebaseUnitsPerGrid, tTimebaseUnitChar,
-                tSlopeChar, MeasurementControl.ADCInputMUXChannelChar, tMinStringBuffer, tAverageStringBuffer, tMaxStringBuffer,
-                tP2PStringBuffer, tTriggerStringBuffer, tReferenceChar);
+        sprintf_P(sStringBuffer, PSTR("%3u%cs %c      %s %s %s P2P%sV %sV %c"), tTimebaseUnitsPerGrid, tTimebaseUnitChar,
+                tSlopeChar, tMinStringBuffer, tAverageStringBuffer, tMaxStringBuffer, tP2PStringBuffer, tTriggerStringBuffer,
+                tReferenceChar);
+        memcpy_P(&sStringBuffer[8], ADCInputMUXChannelStrings[MeasurementControl.ADCInputMUXChannelIndex], 4);
         BlueDisplay1.drawText(INFO_LEFT_MARGIN, FONT_SIZE_INFO_LONG_ASC, sStringBuffer, FONT_SIZE_INFO_LONG, COLOR_BLACK,
         COLOR_INFO_BACKGROUND);
 
         /*
-         * 2. line - timing
+         * 2. line - timing + channel
          */
         // 8 Character
         sprintf_P(sStringBuffer, PSTR(" %5luHz"), tHertz);
@@ -2560,7 +1824,7 @@ void printInfo(void) {
         /*
          * Delay - 14 character including leading space
          */
-        if (MeasurementControl.TriggerDelay != TRIGGER_DELAY_NONE) {
+        if (MeasurementControl.TriggerDelayMode != TRIGGER_DELAY_NONE) {
             strcpy_P(&sStringBuffer[35], PSTR(" del "));
             printfTriggerDelay(&sStringBuffer[40], MeasurementControl.TriggerDelayMillisOrMicros);
         }
@@ -2599,7 +1863,52 @@ void printInfo(void) {
         BlueDisplay1.drawText(INFO_LEFT_MARGIN, FONT_SIZE_INFO_SHORT_ASC, sStringBuffer, FONT_SIZE_INFO_SHORT, COLOR_BLACK,
         COLOR_INFO_BACKGROUND);
     }
+}
 
+// TODO we have a lot of duplicate code here and in printInfo()
+void printTriggerInfo(void) {
+    float tVoltage;
+    float tRefMultiplier;
+    if (MeasurementControl.ChannelHasActiveAttenuator) {
+        tRefMultiplier = 2.0 / 1.1;
+    } else {
+        tRefMultiplier = 1;
+    }
+    if (MeasurementControl.ADCReference == DEFAULT) {
+        tRefMultiplier *= MeasurementControl.VCC / 1024.0;
+        /*
+         * Use 1023 to get 5V display for full scale reading
+         * Better would be 5.0 / 1024.0; since the reading for value for 5V- 1LSB is also 1023,
+         * but this implies that the maximum displayed value is 4.99(51171875) :-(
+         */
+    } else {
+        tRefMultiplier *= 1.1 / 1024.0;
+    }
+    tRefMultiplier *= getAttenuatorFactor();
+
+    int16_t tACOffset = 0;
+    if (MeasurementControl.ChannelIsACMode) {
+        tACOffset = MeasurementControl.RawDSOReadingACZero;
+    }
+    tVoltage = ((int16_t) MeasurementControl.RawTriggerLevel - tACOffset);
+
+    tVoltage = tRefMultiplier * tVoltage;
+    uint8_t tPrecision = 2 - MeasurementControl.AttenuatorValue;
+    dtostrf(tVoltage, 5, tPrecision, sStringBuffer);
+    sStringBuffer[5] = 'V';
+    sStringBuffer[6] = '\0';
+
+    uint8_t tYPos = TRIGGER_LEVEL_INFO_SHORT_Y;
+    uint16_t tXPos = TRIGGER_LEVEL_INFO_SHORT_X;
+    uint8_t tFontsize = FONT_SIZE_INFO_SHORT;
+    if (DisplayControl.showInfoMode == INFO_MODE_NO_INFO) {
+        tYPos = FONT_SIZE_INFO_SHORT_ASC;
+    } else if (DisplayControl.showInfoMode == INFO_MODE_LONG_INFO) {
+        tXPos = TRIGGER_LEVEL_INFO_LONG_X;
+        tYPos = TRIGGER_LEVEL_INFO_LONG_Y;
+        tFontsize = FONT_SIZE_INFO_LONG;
+    }
+    BlueDisplay1.drawText(tXPos, tYPos, sStringBuffer, tFontsize, COLOR_BLACK, COLOR_INFO_BACKGROUND);
 }
 
 /*
@@ -2612,7 +1921,7 @@ void printVCCAndTemperature(void) {
         float tTemp = getTemperature();
         dtostrf(tTemp, 4, 1, &sStringBuffer[40]);
         sprintf_P(sStringBuffer, PSTR("%s Volt %s\xB0" "C"), &sStringBuffer[30], &sStringBuffer[40]);
-        BlueDisplay1.drawText(BUTTON_WIDTH_3_POS_2, BUTTON_HEIGHT_4_256_LINE_4 - (TEXT_SIZE_11_DECEND + 3), sStringBuffer,
+        BlueDisplay1.drawText(BUTTON_WIDTH_3_POS_2, SETTINGS_PAGE_INFO_Y, sStringBuffer,
         TEXT_SIZE_11, COLOR_BLACK, COLOR_BACKGROUND_DSO);
     }
 }
@@ -2624,6 +1933,7 @@ void printVCCAndTemperature(void) {
 /*
  * initialize RAM between actual stack and actual heap start (__brkval) with pattern 0x5A
  */
+#define HEAP_STACK_UNTOUCHED_VALUE 0x5A
 void initStackFreeMeasurement(void) {
     extern unsigned int __heap_start;
     extern void * __brkval;
@@ -2636,7 +1946,7 @@ void initStackFreeMeasurement(void) {
 
 // Fill memory
     do {
-        *tHeapPtr++ = 0x5A;
+        *tHeapPtr++ = HEAP_STACK_UNTOUCHED_VALUE;
     } while (tHeapPtr < &v);
 }
 
@@ -2646,7 +1956,7 @@ void initStackFreeMeasurement(void) {
 uint16_t getStackFreeMinimumBytes(void) {
     extern unsigned int __heap_start;
     extern void * __brkval;
-    uint8_t v;
+    uint8_t tDummyVariableOnStack;
 
     uint8_t * tHeapPtr = (uint8_t *) __brkval;
     if (tHeapPtr == 0) {
@@ -2654,12 +1964,12 @@ uint16_t getStackFreeMinimumBytes(void) {
     }
 
 // first search for first match, because malloc() and free() may be happened in between
-    while (*tHeapPtr != 0x5A && tHeapPtr < &v) {
+    while (*tHeapPtr != 0x5A && tHeapPtr < &tDummyVariableOnStack) {
         tHeapPtr++;
     }
 // then count untouched patterns
     uint16_t tStackFree = 0;
-    while (*tHeapPtr == 0x5A && tHeapPtr < &v) {
+    while (*tHeapPtr == HEAP_STACK_UNTOUCHED_VALUE && tHeapPtr < &tDummyVariableOnStack) {
         tHeapPtr++;
         tStackFree++;
     }
@@ -2674,11 +1984,11 @@ uint16_t getStackFreeMinimumBytes(void) {
 void printFreeStack(void) {
     uint16_t tUntouchesBytesOnStack = getStackFreeMinimumBytes();
     sprintf_P(sStringBuffer, PSTR("%4u Bytes stack"), tUntouchesBytesOnStack);
-    BlueDisplay1.drawText(0, BUTTON_HEIGHT_4_256_LINE_4 - (TEXT_SIZE_11_DECEND + 3), sStringBuffer,
+    BlueDisplay1.drawText(0, SETTINGS_PAGE_INFO_Y, sStringBuffer,
     TEXT_SIZE_11, COLOR_BLACK, COLOR_BACKGROUND_DSO);
 }
 
-bool changeTimeBaseValue(int8_t aChangeValue, bool doOutput) {
+uint8_t changeTimeBaseValue(int8_t aChangeValue) {
     bool IsError = false;
     uint8_t tOldIndex = MeasurementControl.TimebaseIndex;
 
@@ -2742,9 +2052,6 @@ bool changeTimeBaseValue(int8_t aChangeValue, bool doOutput) {
     } else {
         DisplayControl.XScale = 1;
     }
-    if (doOutput) {
-        printInfo();
-    }
     if (tStartNewAcquisition) {
         startAcquisition();
     }
@@ -2752,7 +2059,7 @@ bool changeTimeBaseValue(int8_t aChangeValue, bool doOutput) {
     return IsError;
 }
 
-uint8_t getDisplayFromRawValue(uint16_t aRawValue) {
+uint8_t getDisplayFromRawInputValue(uint16_t aRawValue) {
     aRawValue -= MeasurementControl.OffsetValue;
     aRawValue >>= MeasurementControl.ShiftValue;
     if (DISPLAY_VALUE_FOR_ZERO > aRawValue) {
@@ -2762,7 +2069,7 @@ uint8_t getDisplayFromRawValue(uint16_t aRawValue) {
     }
 }
 
-uint16_t getRawFromDisplayValue(uint8_t aDisplayValue) {
+uint16_t getInputRawFromDisplayValue(uint8_t aDisplayValue) {
     aDisplayValue = DISPLAY_VALUE_FOR_ZERO - aDisplayValue;
     uint16_t aValue16 = aDisplayValue << MeasurementControl.ShiftValue;
     aValue16 = aValue16 + MeasurementControl.OffsetValue;
@@ -2783,7 +2090,7 @@ float getFloatFromDisplayValue(uint8_t aDisplayValue) {
     } else {
         tFactor *= 1.1 / 1024.0;
     }
-    int16_t tRaw = getRawFromDisplayValue(aDisplayValue);
+    int16_t tRaw = getInputRawFromDisplayValue(aDisplayValue);
     if (MeasurementControl.ChannelIsACMode) {
         tRaw -= MeasurementControl.RawDSOReadingACZero;
     }
@@ -2824,21 +2131,17 @@ void setVCCValue(void) {
  * For active attenuator also:
  * ChannelHasAttenuator
  *  */
-void setChannel(uint8_t aChannel, bool doGUI) {
+void setChannel(uint8_t aChannel) {
+    MeasurementControl.ADCInputMUXChannelIndex = aChannel;
     MeasurementControl.ShiftValue = 2;
-    if (aChannel == 16) {
-        // do wrap around
-        aChannel = 3;
-        MeasurementControl.ADCInputMUXChannelChar = 0x33;
-    }
     bool tIsACMode = false;
-    uint8_t tHasACDC = false;
+//    uint8_t tHasACDC = false;
     uint8_t tReference = DEFAULT; // DEFAULT/1 -> VCC   INTERNAL/3 -> 1.1V
 
     if (MeasurementControl.AttenuatorType >= ATTENUATOR_TYPE_ACTIVE_ATTENUATOR) {
         if (aChannel < NUMBER_OF_CHANNEL_WITH_ACTIVE_ATTENUATOR) {
             MeasurementControl.ChannelHasActiveAttenuator = true;
-            tHasACDC = true;
+//            tHasACDC = true;
             // restore AC mode for this channels
             tIsACMode = MeasurementControl.isACMode;
             // use internal reference if attenuator is available
@@ -2853,53 +2156,30 @@ void setChannel(uint8_t aChannel, bool doGUI) {
     } else if (MeasurementControl.AttenuatorType == ATTENUATOR_TYPE_FIXED_ATTENUATOR) {
         if (aChannel < NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR) {
             MeasurementControl.AttenuatorValue = aChannel; // channel 0 has 10^0 attenuation factor etc.
-            tHasACDC = true;
+            //           tHasACDC = true;
             // restore AC mode for this channels
             tIsACMode = MeasurementControl.isACMode;
             tReference = INTERNAL;
         }
     }
     MeasurementControl.ChannelIsACMode = tIsACMode;
-    MeasurementControl.ChannelHasACDCSwitch = tHasACDC;
+//    MeasurementControl.ChannelHasACDCSwitch = tHasACDC;
     MeasurementControl.ADCReference = tReference;
+    setReferenceButtonCaption();
+
+    /*
+     * Map channel index to special channel numbers
+     */
+    if (aChannel == MAX_ADC_CHANNEL + 1) {
+        aChannel = ADC_TEMPERATURE_CHANNEL; // Temperature
+    }
+    if (aChannel == MAX_ADC_CHANNEL + 2) {
+        aChannel = ADC_1_1_VOLT_CHANNEL; // 1.1 Reference
+    }
     ADMUX = aChannel | (tReference << REFS0);
 
 //the second parameter for active attenuator is only needed if ChannelHasActiveAttenuator == true
     setInputRange(2, 2);
-
-    if (aChannel < NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR) {
-        //reset caption of TouchButtonChannelSelect to "Ch 3"
-        MeasurementControl.ADCInputMUXChannelChar = '3';
-    } else if (aChannel <= MAX_ADC_CHANNEL) {
-        // Standard AD channels
-        MeasurementControl.ADCInputMUXChannelChar = 0x30 + aChannel;
-    } else if (aChannel == MAX_ADC_CHANNEL + 1) {
-        aChannel = ADC_TEMPERATURE_CHANNEL; // Temperature
-        MeasurementControl.ADCInputMUXChannelChar = 'T';
-    } else if (aChannel == ADC_TEMPERATURE_CHANNEL + 1) {
-        aChannel = ADC_1_1_VOLT_CHANNEL; // 1.1 Reference
-        MeasurementControl.ADCInputMUXChannelChar = 'R';
-    } else if (aChannel == ADC_1_1_VOLT_CHANNEL + 1) {
-        MeasurementControl.ADCInputMUXChannelChar = 'G'; // Ground
-    }
-    MeasurementControl.ADCInputMUXChannel = aChannel;
-
-// set channel number in caption
-    ChannelSelectButtonString[CHANNEL_STRING_INDEX] = MeasurementControl.ADCInputMUXChannelChar;
-    if (doGUI) {
-        // do not touch gui before Setup is done
-        TouchButtonChannelSelect.setCaption(ChannelSelectButtonString);
-
-        /*
-         * Refresh page if necessary
-         */
-        setReferenceButtonCaption();
-        // check it here since it is also called by setup
-        if (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS) {
-            // manage AC/DC and auto offset buttons
-            drawDSOSettingsPage();
-        }
-    }
 }
 
 inline void setPrescaleFactor(uint8_t aFactor) {
