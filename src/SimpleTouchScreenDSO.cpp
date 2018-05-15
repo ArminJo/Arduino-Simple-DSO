@@ -321,10 +321,6 @@ void initTimer2(void);
  *******************************************************************************************/
 
 void initDisplay(void) {
-    // first synchronize. Since a complete chart data can be missing, send minimum 320 byte
-    for (int i = 0; i < 16; ++i) {
-        BlueDisplay1.sendSync();
-    }
     BlueDisplay1.setFlagsAndSize(
             BD_FLAG_FIRST_RESET_ALL | BD_FLAG_USE_MAX_SIZE | BD_FLAG_LONG_TOUCH_ENABLE | BD_FLAG_ONLY_TOUCH_MOVE_DISABLE,
             REMOTE_DISPLAY_WIDTH, REMOTE_DISPLAY_HEIGHT);
@@ -412,7 +408,7 @@ void setup() {
     delay(100);
     setVCCValue();
 
-    setChannel(tStartChannel);
+    setChannel(tStartChannel); // outputs button caption!
     /*
      * setChannel() needs:
      * AttenuatorType
@@ -448,6 +444,11 @@ void setup() {
 
     //setACMode(!digitalReadFast(AC_DC_PIN));
     initFrequencyGenerator();
+
+    // first synchronize. Since a complete chart data can be missing, send minimum 320 byte
+    for (int i = 0; i < 16; ++i) {
+        BlueDisplay1.sendSync();
+    }
 
     // Register callback handler and check for connection
     BlueDisplay1.initCommunication(&initDisplay, &redrawDisplay);

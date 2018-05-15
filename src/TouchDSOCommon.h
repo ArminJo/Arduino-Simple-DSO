@@ -23,6 +23,8 @@
 #include "PageFrequencyGenerator.h"
 #endif
 
+#define VERSION_DSO "2.0"
+
 #ifdef AVR
 #else
 // No PROGMEM on ARM

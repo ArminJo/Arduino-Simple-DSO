@@ -840,6 +840,11 @@ void drawStartPage(void) {
     COLOR_BACKGROUND_DSO);
     BlueDisplay1.drawTextPGM(10, BUTTON_HEIGHT_4_LINE_2 + (3 * 32), PSTR("300 kSamples/s"), 22, COLOR_BLUE,
     COLOR_BACKGROUND_DSO);
+    uint8_t tPos = BlueDisplay1.drawTextPGM(10, BUTTON_HEIGHT_4_LINE_2 + (3 * 32) + 22,
+            PSTR("V" VERSION_DSO "/" VERSION_BLUE_DISPLAY), 11, COLOR_BLUE, COLOR_BACKGROUND_DSO);
+    BlueDisplay1.drawTextPGM(tPos, BUTTON_HEIGHT_4_LINE_2 + (3 * 32) + 22, PSTR(" from " __DATE__), 11, COLOR_BLUE,
+    COLOR_BACKGROUND_DSO);
+
 // Hints
 #ifndef AVR
     BlueDisplay1.drawText(BUTTON_WIDTH_3_POS_2, TEXT_SIZE_22_ASCEND, "\xABScale\xBB",
@@ -915,7 +920,7 @@ void drawDSOSettingsPage(void) {
 //5. Row
     TouchButtonFrequencyPage.drawButton();
 //    if (MeasurementControl.ChannelHasACDCSwitch) {
-        TouchButtonAcDc.drawButton();
+    TouchButtonAcDc.drawButton();
 //    }
 
 #ifdef AVR
