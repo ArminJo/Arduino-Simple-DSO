@@ -117,8 +117,6 @@ const unsigned int REMOTE_DISPLAY_WIDTH = 320;
 #define ATTENUATOR_TYPE_ACTIVE_ATTENUATOR 2 // to be developed
 #define NUMBER_OF_CHANNEL_WITH_ACTIVE_ATTENUATOR 2
 
-#define MAX_ADC_CHANNEL 5
-
 struct MeasurementControlStruct {
     // State
     bool isRunning;

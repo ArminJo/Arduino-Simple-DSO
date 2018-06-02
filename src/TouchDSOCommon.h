@@ -23,7 +23,7 @@
 #include "PageFrequencyGenerator.h"
 #endif
 
-#define VERSION_DSO "2.0"
+#define VERSION_DSO "2.1"
 
 #ifdef AVR
 #else
@@ -53,8 +53,9 @@
 /*
  * CHANNEL
  */
+#define MAX_ADC_EXTERNAL_CHANNEL 4 // 5 channels 0-4, since ADC5/PC5 is used for AC/DC switching
 #ifdef AVR
-#define ADC_CHANNEL_COUNT 8 // The number of ADC channels
+#define ADC_CHANNEL_COUNT ((MAX_ADC_EXTERNAL_CHANNEL + 1) + 2) // The number of external and internal ADC channels
 #else
 #define START_ADC_CHANNEL_INDEX 0  // see also ChannelSelectButtonString
 #ifdef STM32F303xC
@@ -62,12 +63,12 @@
 #else
 #define ADC_CHANNEL_COUNT 6 // The number of ADC channels
 #endif
+extern uint8_t const ADCInputMUXChannels[ADC_CHANNEL_COUNT];
 #endif
-#define NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR 3 // Channel0 = /1, Ch1= /10, Ch2= /100
+#define NUMBER_OF_CHANNELS_WITH_FIXED_ATTENUATOR 3 // Channel0 = /1, Ch1= /10, Ch2= /100
 
 extern const char * const ADCInputMUXChannelStrings[ADC_CHANNEL_COUNT];
-extern uint8_t const ADCInputMUXChannels[ADC_CHANNEL_COUNT];
-extern const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR];
+extern const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNELS_WITH_FIXED_ATTENUATOR];
 
 /*
  * Trigger values
@@ -98,12 +99,15 @@ extern const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNEL_WITH_FIXED
  * Don't need to use timer for timebase, since the ADC is also driven by clock and with a few delay times of the ISR
  * one can get reproducible timings just with the ADC conversion timing!
  *
+ * Since prescaler PRESCALE4 gives bad quality, use PRESCALE8 for 201 us range and display each value twice.
+ * PRESCALE8 has pretty good quality, but PRESCALE16 (496 us/div) performs slightly better.
+ *
  * Different Acquisition modes depending on Timebase:
- * Mode ultrafast  10us - ADC free running - one loop for read and store 10 bit => needs double buffer space - interrupts blocked for duration of loop
- * Mode fast   20-201us - ADC free running - one loop for read but pre process 10 -> 8 Bit and store - interrupts blocked for duration of loop
- * mode isr without delay 496us   - ADC generates Interrupts - because of ISR initial delay for push just start next conversion immediately
- * mode isr with delay    1,2,5ms - ADC generates Interrupts - busy delay, then start next conversion to match 1,2,5 timebase scale
- * mode isr with multiple read >=10ms - ADC generates Interrupts - to avoid excessive busy delays, start one ore more intermediate conversion just for delay purposes
+ * Mode ultrafast  10-50us - ADC free running with PRESCALE4 - one loop for read and store 10 bit => needs double buffer space - interrupts blocked for duration of loop
+ * Mode fast   101-201us - ADC free running with PRESCALE8 - one loop for read but pre process 10 -> 8 Bit and store - interrupts blocked for duration of loop
+ * mode ISR without delay 496us   - ADC with PRESCALE16 generates Interrupts - because of ISR initial delay for push just start next conversion immediately
+ * mode ISR with delay    1,2,5ms - ADC PRESCALE32 + 64 generates Interrupts - ISR has busy delay, then start next conversion to match 1,2,5 timebase scale
+ * mode ISR with multiple read >=10ms - ADC generates Interrupts - to avoid excessive busy delays, start one ore more intermediate conversion just for delay purposes
  */
 
 #define HORIZONTAL_GRID_COUNT 6
@@ -124,9 +128,9 @@ extern const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNEL_WITH_FIXED
 #define TIMING_GRID_WIDTH 31 // with 31 instead of 32 the values fit better to 1-2-5 timebase scale
 #define TIMEBASE_NUMBER_OF_ENTRIES 15 // the number of different timebases provided
 #define TIMEBASE_NUMBER_OF_FAST_PRESCALE 8 // the number of prescale values not equal slowest possible prescale (PRESCALE128)
-#define TIMEBASE_INDEX_ULTRAFAST_MODES 0 // first timebase (10) is ultrafast
-#define TIMEBASE_INDEX_FAST_MODES 4 // first 5 timebase (10 - 201) are fast free running modes with polling instead of ISR
-#define TIMEBASE_NUMBER_OF_XSCALE_CORRECTION 4  // number of timebase which are simulated by display XSale factor
+#define TIMEBASE_INDEX_FAST_MODES 4 // first 5 timebase (10 - 201) are fast free running modes with polling instead of ISR using PRESCALE4 + PRESCALE8
+#define TIMEBASE_INDEX_ULTRAFAST_MODES 2 // first 3 timebase (10 - 50) using PRESCALE4 is ultra fast polling without preprocessing and therefore needs double buffer size
+#define TIMEBASE_NUMBER_OF_XSCALE_CORRECTION 4  // number of timebase which are simulated by display XSale factor. Since PRESCALE4 gives bad quality, use PRESCALE8 and XScale for 201 us range
 #define TIMEBASE_INDEX_MILLIS 6 // min index to switch to ms instead of us display
 #define TIMEBASE_INDEX_DRAW_WHILE_ACQUIRE 11 // min index where chart is drawn while buffer is filled (11 => 50ms)
 // the delay between ADC end of conversion and first start of code in ISR

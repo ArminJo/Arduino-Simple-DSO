@@ -472,20 +472,19 @@ BDButton TouchButtonChartHistoryOnOff;
 BDButton TouchButtonSlope;
 char SlopeButtonString[] = "Slope A";
 
-BDButton TouchButtonChannels[NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR];
+BDButton TouchButtonChannels[NUMBER_OF_CHANNELS_WITH_FIXED_ATTENUATOR];
 BDButton TouchButtonChannelSelect;
 const char StringChannel0[] PROGMEM = "Ch 0";
 const char StringChannel1[] PROGMEM = "Ch 1";
 const char StringChannel2[] PROGMEM = "Ch 2";
 const char StringChannel3[] PROGMEM = "Ch 3";
 const char StringChannel4[] PROGMEM = "Ch 4";
-const char StringChannel5[] PROGMEM = "Ch 5";
 const char StringTemperature[] PROGMEM = "Temp";
 const char StringVRefint[] PROGMEM = "VRef";
 const char StringVBattDiv2[] PROGMEM = "\xBD" "VBatt";
 #ifdef AVR
 const char * const ADCInputMUXChannelStrings[ADC_CHANNEL_COUNT] = { StringChannel0, StringChannel1, StringChannel2, StringChannel3,
-        StringChannel4, StringChannel5, StringTemperature, StringVRefint };
+        StringChannel4, StringTemperature, StringVRefint };
 #else
 #ifdef STM32F30X
 const char * const ADCInputMUXChannelStrings[ADC_CHANNEL_COUNT] = {StringChannel2, StringChannel3, StringChannel4,
@@ -502,7 +501,7 @@ const uint8_t ADCInputMUXChannels[ADC_CHANNEL_COUNT] = {ADC_CHANNEL_0, ADC_CHANN
 const char ChannelDivBy1ButtonString[] PROGMEM = "\xF7" "1";
 const char ChannelDivBy10ButtonString[] PROGMEM = "\xF7" "10";
 const char ChannelDivBy100ButtonString[] PROGMEM = "\xF7" "100";
-const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR] = { ChannelDivBy1ButtonString,
+const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNELS_WITH_FIXED_ATTENUATOR] = { ChannelDivBy1ButtonString,
         ChannelDivBy10ButtonString, ChannelDivBy100ButtonString };
 BDButton TouchButtonChannelMode;
 
@@ -877,7 +876,7 @@ void drawDSOSettingsPage(void) {
     /*
      * Determine colors for 3 fixed channel buttons
      */
-    for (int i = 0; i < NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR; ++i) {
+    for (int i = 0; i < NUMBER_OF_CHANNELS_WITH_FIXED_ATTENUATOR; ++i) {
         if (i == MeasurementControl.ADCInputMUXChannelIndex) {
             tButtonColor = BUTTON_AUTO_RED_GREEN_TRUE_COLOR;
         } else {
@@ -885,7 +884,7 @@ void drawDSOSettingsPage(void) {
         }
         TouchButtonChannels[i].setButtonColorAndDraw(tButtonColor);
     }
-    if (MeasurementControl.ADCInputMUXChannelIndex >= NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR) {
+    if (MeasurementControl.ADCInputMUXChannelIndex >= NUMBER_OF_CHANNELS_WITH_FIXED_ATTENUATOR) {
         tButtonColor = BUTTON_AUTO_RED_GREEN_TRUE_COLOR;
     } else {
         tButtonColor = BUTTON_AUTO_RED_GREEN_FALSE_COLOR;
@@ -1179,7 +1178,7 @@ void drawGridLinesWithHorizLabelsAndTriggerLine() {
  * Button caption section
  ************************************************************************/
 void setChannelButtonsCaption(void) {
-    for (uint8_t i = 0; i < NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR; ++i) {
+    for (uint8_t i = 0; i < NUMBER_OF_CHANNELS_WITH_FIXED_ATTENUATOR; ++i) {
         if (MeasurementControl.AttenuatorType == ATTENUATOR_TYPE_FIXED_ATTENUATOR) {
             TouchButtonChannels[i].setCaptionPGM(ChannelDivByButtonStrings[i]);
         } else {
@@ -1545,16 +1544,16 @@ void doChannelSelect(BDButton * aTheTouchedButton, int16_t aValue) {
              */
             uint8_t tOldValue = MeasurementControl.ADCInputMUXChannelIndex;
             // if channel 3 is not selected, increment channel, otherwise select channel 3
-            if (tOldValue < NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR) {
+            if (tOldValue < NUMBER_OF_CHANNELS_WITH_FIXED_ATTENUATOR) {
                 // first press on this button -> stay at channel 3
-                tNewChannelValue = NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR;
+                tNewChannelValue = NUMBER_OF_CHANNELS_WITH_FIXED_ATTENUATOR;
             } else {
                 tNewChannelValue = tOldValue + 1;
                 uint8_t tCaptionIndex = tNewChannelValue;
                 if (tNewChannelValue >= ADC_CHANNEL_COUNT) {
                     tNewChannelValue = 0;
-                    //reset caption of 4. button to channel 3
-                    tCaptionIndex = NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR;
+                    //reset caption of 4. button to "Ch 3"
+                    tCaptionIndex = NUMBER_OF_CHANNELS_WITH_FIXED_ATTENUATOR;
                 }
                 TouchButtonChannelSelect.setCaptionPGM(ADCInputMUXChannelStrings[tCaptionIndex]);
             }

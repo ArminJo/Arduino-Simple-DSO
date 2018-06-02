@@ -135,6 +135,7 @@
  * A5   AC bias - AC -> High impedance (input) / DC -> set as output LOW
  *
  * Timer0  8 bit - Arduino delay() and millis() functions
+ * Timer1 16 bit - internal waveform generator
  *
  */
 
@@ -176,10 +177,11 @@ const uint16_t TimebaseDivPrintValues[TIMEBASE_NUMBER_OF_ENTRIES] PROGMEM = { 10
         200, 500 };
 // exact values for 31 grid - for period and frequency
 const float TimebaseExactDivValuesMicros[TIMEBASE_NUMBER_OF_ENTRIES] PROGMEM
-= { 100.75/*(31*13*0,25)*/, 201.5, 201.5, 201.5, 201.5 /*(31*13*0,5)*/, 496 /*(31*16*1)*/, 992 /*(31*16*2)*/, 1984 /*(31*16*4)*/,
+= { 100.75/*(31*13*0,25)*/, 100.75, 100.75, 201.5, 201.5 /*(31*13*0,5)*/, 496 /*(31*16*1)*/, 992 /*(31*16*2)*/, 1984 /*(31*16*4)*/,
         4960 /*(31*20*8)*/, 9920 /*(31*40*8)*/, 20088 /*(31*81*8)*/, 50096 /*(31*202*8)*/, 99944 /*(31*403*8)*/,
         199888 /*(31*806*8)*/, 499968 /*(31*2016*8)*/};
 /*
+ * Delays used for slow timebase to adjust sampling rate to match the 1,2,5 scale of timebase
  * For prescale 4 is: 13*0.25 = 3.25us per conversion
  * 8->6.5us, 16->13us ,32->2*13=26 for 1ms Range, 64->51, 128->8*13=104us per conversion
  *
@@ -196,7 +198,8 @@ const uint16_t TimebaseDelayValues[TIMEBASE_NUMBER_OF_ENTRIES] = { 0, 0, 0, 0, 0
         ((806 - ADC_CYCLES_PER_CONVERSION) * 8 * 4) - ISR_DELAY_MICROS_TIMES_4, //
         (((uint16_t) (2016 - ADC_CYCLES_PER_CONVERSION) * 8 * 4) - ISR_DELAY_MICROS_TIMES_4), // 16025 us needed = 64077 | 500ms
         };
-const uint8_t xScaleForTimebase[TIMEBASE_NUMBER_OF_XSCALE_CORRECTION] = { 10, 5, 2, 2 }; // for GUI and frequency
+const uint8_t xScaleForTimebase[TIMEBASE_NUMBER_OF_XSCALE_CORRECTION] = { 10, 5, 2, 2 }; // multiply displayed values to simulate a faster timebase.
+// since prescale PRESCALE4 has bad quality use PRESCALE8 for 201 us range and display each value twice
 const uint8_t PrescaleValueforTimebase[TIMEBASE_NUMBER_OF_FAST_PRESCALE] = { PRESCALE4, PRESCALE4, PRESCALE4, PRESCALE8, PRESCALE8,
 PRESCALE16 /*496us*/, PRESCALE32, PRESCALE64 /*2ms*/};
 
@@ -1475,7 +1478,8 @@ void doSetTriggerDelay(float aValue) {
     if (aValue != NUMBER_INITIAL_VALUE_DO_NOT_SHOW) {
         uint32_t tTriggerDelay = aValue;
         if (tTriggerDelay != 0) {
-            if (tTriggerDelay > __UINT16_MAX__) {
+            // divided by 4, since in delayMicroseconds() we find "us <<= 2;" :-(
+            if (tTriggerDelay > (__UINT16_MAX__ / 4)) {
                 tTriggerDelayMode = TRIGGER_DELAY_MILLIS;
                 MeasurementControl.TriggerDelayMillisOrMicros = tTriggerDelay / 1000;
             } else {
@@ -2136,6 +2140,7 @@ void setChannel(uint8_t aChannel) {
     MeasurementControl.ADCInputMUXChannelIndex = aChannel;
     MeasurementControl.ShiftValue = 2;
     bool tIsACMode = false;
+    MeasurementControl.AttenuatorValue = 0; // no attenuator attached at channel
 //    uint8_t tHasACDC = false;
     uint8_t tReference = DEFAULT; // DEFAULT/1 -> VCC   INTERNAL/3 -> 1.1V
 
@@ -2151,11 +2156,9 @@ void setChannel(uint8_t aChannel) {
             MeasurementControl.ChannelHasActiveAttenuator = false;
             // protect input. Since ChannelHasActiveAttenuator = false it will not be changed by setInputRange()
             setAttenuator(3);
-            // signal that no attenuator attached at channel
-            MeasurementControl.AttenuatorValue = 0;
         }
     } else if (MeasurementControl.AttenuatorType == ATTENUATOR_TYPE_FIXED_ATTENUATOR) {
-        if (aChannel < NUMBER_OF_CHANNEL_WITH_FIXED_ATTENUATOR) {
+        if (aChannel < NUMBER_OF_CHANNELS_WITH_FIXED_ATTENUATOR) {
             MeasurementControl.AttenuatorValue = aChannel; // channel 0 has 10^0 attenuation factor etc.
             //           tHasACDC = true;
             // restore AC mode for this channels
@@ -2171,10 +2174,10 @@ void setChannel(uint8_t aChannel) {
     /*
      * Map channel index to special channel numbers
      */
-    if (aChannel == MAX_ADC_CHANNEL + 1) {
+    if (aChannel == MAX_ADC_EXTERNAL_CHANNEL + 1) {
         aChannel = ADC_TEMPERATURE_CHANNEL; // Temperature
     }
-    if (aChannel == MAX_ADC_CHANNEL + 2) {
+    if (aChannel == MAX_ADC_EXTERNAL_CHANNEL + 2) {
         aChannel = ADC_1_1_VOLT_CHANNEL; // 1.1 Reference
     }
     ADMUX = aChannel | (tReference << REFS0);
