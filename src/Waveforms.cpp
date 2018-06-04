@@ -16,6 +16,11 @@
  *
  * Output is at PIN 10
  *
+ * PWM RC-Filter suggestions
+ * Simple: 2k2 Ohm and 100 nF
+ * 2nd order (good for sine and triangle): 1 kOhm and 100 nF -> 4k7 Ohm and 22 nF
+ * 2nd order (better for sawtooth):        1 kOhm and 22 nF  -> 4k7 Ohm and 4.7 nF
+ *
  *  Copyright (C) 2017  Armin Joachimsmeyer
  *  Email: armin.joachimsmeyer@gmail.com
  *

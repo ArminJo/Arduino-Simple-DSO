@@ -37,6 +37,17 @@
 #define PSTR(a) a
 #endif
 
+#ifdef AVR
+// Data buffer size (must be small enough to leave appr. 7 % (144 Byte) for stack
+#define DATABUFFER_SIZE (3*REMOTE_DISPLAY_WIDTH) //960
+#else
+#ifdef STM32F303xC
+#define DATABUFFER_SIZE_FACTOR 10
+#else
+#define DATABUFFER_SIZE_FACTOR 7
+#endif
+#endif
+
 #define DISPLAY_VALUE_FOR_ZERO (REMOTE_DISPLAY_HEIGHT - 1)
 //#define DISPLAY_VALUE_FOR_ZERO (REMOTE_DISPLAY_HEIGHT - 2) // Zero line is not exactly at bottom of display to improve readability
 
@@ -78,11 +89,14 @@ extern const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNELS_WITH_FIXE
 #define TRIGGER_MODE_MANUAL 2 // without timeout
 #define TRIGGER_MODE_FREE 3 // waits at least 23 ms (255 samples) for trigger
 #define TRIGGER_MODE_EXTERN 4
+#define TRIGGER_HYSTERESIS_FOR_MODE_MANUAL 4
 
 #ifdef AVR
 /*****************************
  * Timebase stuff
  *****************************/
+#define TIMEBASE_INDEX_START_VALUE 7 // 2ms - shows 50 Hz
+
 // ADC HW prescaler values
 #define PRESCALE4    2 // is noisy
 #define PRESCALE8    3 // is reasonable
@@ -122,6 +136,8 @@ extern const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNELS_WITH_FIXE
  * 0.1 Volt -> 93 pixel with scale (shift) 1 => 46.5 pixel
  * 0.05 Volt -> 46.5 pixel
  */
+
+
 #define HORIZONTAL_GRID_HEIGHT_1_1V_SHIFT8 11904 // 46.5*256 for 0.05 to 0.2 Volt/div for 6 divs per screen
 #define HORIZONTAL_GRID_HEIGHT_2V_SHIFT8 6554 // 25.6*256 for 0.05 to 0.2 Volt/div for 10 divs per screen
 #define ADC_CYCLES_PER_CONVERSION 13
@@ -141,6 +157,8 @@ extern const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNELS_WITH_FIXE
 /*
  * TIMEBASE
  */
+#define TIMEBASE_INDEX_START_VALUE 12
+
 #define CHANGE_REQUESTED_TIMEBASE_FLAG 0x01
 
 #define TIMEBASE_NUMBER_OF_ENTRIES 21 // the number of different timebase provided - 1. entry is not uses until interleaved acquisition is implemented
@@ -157,7 +175,6 @@ extern const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNELS_WITH_FIXE
 #endif
 #define TIMEBASE_INDEX_MILLIS 11 // min index to switch to ms instead of ns display
 #define TIMEBASE_INDEX_MICROS 2 // min index to switch to us instead of ns display
-#define TIMEBASE_INDEX_START_VALUE 12
 #endif
 
 extern const float TimebaseExactDivValuesMicros[] PROGMEM;
@@ -347,7 +364,7 @@ void drawDataBuffer(uint8_t *aByteBuffer, uint16_t aColor, uint16_t aClearBefore
 int scrollChart(int aValue);
 int getDisplayFromRawInputValue(int aAdcValue);
 void drawDataBuffer(uint16_t *aDataBufferPointer, int aLength, color16_t aColor, color16_t aClearBeforeColor, int aDrawMode,
-        bool aDrawAlsoMin);
+bool aDrawAlsoMin);
 void startSystemInfoPage(void);
 #endif
 
@@ -356,7 +373,7 @@ extern unsigned int sMillisSinceLastInfoOutput;
 void printfTriggerDelay(char * aDataBufferPtr, uint16_t aTriggerDelayMillisOrMicros);
 void printVCCAndTemperature(void);
 void clearInfo(uint8_t aOldMode);
-void printInfo(void);
+void printInfo(bool aRecomputeValues = true);
 void printTriggerInfo(void);
 
 // GUI event handler section
