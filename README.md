@@ -1,4 +1,7 @@
 # Arduino-Simple-DSO
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
 This is the eclipse project repository. This DSO-code is also available as an Arduino example sketch under [Arduino-BlueDisplay](https://github.com/ArminJo/Arduino-BlueDisplay).
 
 ## SUMMARY
