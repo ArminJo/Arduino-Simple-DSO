@@ -120,23 +120,24 @@
 /*
  * PIN
  * 2    External trigger input
- * 3   Not yet used
- * 4   - If active attenuator, attenuator range control, else not yet used
- * 5   - If active attenuator, attenuator range control, else not yet used
- * 6   - If active attenuator, AC (high) / DC (low) relay, else debug output of half the timebase of Timer 0 for range 496us and higher -> frequency <= 31,25kHz (see changeTimeBaseValue())
- * 7   Not yet used
- * 8    Attenuator configuration input with internal pullup - bit 0
- * 9    Attenuator configuration input with internal pullup - bit 1  11-> no attenuator attached, 10-> simple (channel 0-2) attenuator attached, 0x-> active (channel 0-1) attenuator attached
- * 10   Frequency / waveform generator output of Timer1 (16 bit)
- * 11  - If active attenuator, square wave for VEE (-5V) generation by timer2 output, else not yet used
- * 12  Not yet used
+ * 3
+ * 4    Attenuator range control (for active attenuator)
+ * 5    Attenuator range control (for active attenuator)
+ * 6    AC / DC relais (for active attenuator)
+ * 7    AC / DC relais (for active attenuator)
+ * 8    Attenuator detect input with internal pullup - bit 0
+ * 9    Attenuator detect input with internal pullup - bit 1  11-> no attenuator attached, 10-> simple (channel 0-2) attenuator attached, 0x-> active (channel 0-1) attenuator attached
+ * 10   Timer0  8 bit - Generates sample frequency
+ * 10   Timer1 16 bit - Frequency / waveform generator output
+ * 11   Timer2  8 bit - triggers ISR for Arduino millis() since timer0 is not available for this. Also square wave for VEE (-5V) generation
+ * 12   Not yet used
  * 13   Internal LED / timing debug output
  *
- * A5   AC bias - if mode is AC, high impedance (input), if mode is DC, set as output LOW
+ * A5   AC bias - AC -> High impedance (input) / DC -> set as output LOW
  *
- * Timer0  8 bit - Generates sample frequency
- * Timer1 16 bit - Internal waveform generator
- * Timer2  8 bit - Triggers ISR for Arduino millis() since timer0 is not available for this (switched from timer 0 at setup())
+ * Timer0  8 bit - Arduino delay() and millis() functions
+ * Timer1 16 bit - internal waveform generator
+ * Timer2  8 bit - Square wave for VEE (-5V) generation
  */
 
 /*
@@ -169,38 +170,8 @@ bool sBackButtonPressed;
 #define INTERNAL 3
 #endif
 
-#if !defined(TIMSK2)
-// on ATmega32U4 we have no timer2 but one timer3
-#define TIMSK2 TIMSK3
-#define TOIE2  TOIE3
-#endif
-
 #define ADC_TEMPERATURE_CHANNEL 8
 #define ADC_1_1_VOLT_CHANNEL 0x0E
-
-/*
- * Timebase values overview:
- *                            conversion
- * idx range   ADCpresc. clk     us    us/div  us/320  x-scale  TIMER0 CTC
- * 0   10us    PRESCALE4 0.25     3.25  101.75  1040    10  prescaler
- * 1   20us    PRESCALE4 0.25     3.25  101.75  1040     5      micros
- * 2   50us    PRESCALE4 0.25     3.25  101.75  1040     2           value
- * 3  101us    PRESCALE8  0.5     6.5   201.5   2080     2
- * 4  201us    PRESCALE8  0.5     6.5   201.5   2080     1
- * 5  496us    PRESCALE16   1    16     496     5120     1     8  0.5   32
- * 6    1ms    PRESCALE32   2    32     992    10240     1     8  0.5   64
- * 7    2ms    PRESCALE64   4    64    1984    20480     1     8  0.5  128
- * 8    5ms    PRESCALE128  8   160    4960    51200     1    64    4   40
- * 9   10ms    PRESCALE128  8   320    9920   102400     1    64    4   80
- * 10  20ms    PRESCALE128  8   648   20088   207360     1    64    4  162
- * 11  50ms    PRESCALE128  8  1616   50096   517120     1   256   16  101
- * 12 100ms    PRESCALE128  8  3224   99944   517120     1   256   16  201.5
- * 12 100ms    PRESCALE128  8  3216   99696   517120     1   256   16  201
- * 12 100ms    PRESCALE128  8  3232  100192   517120     1   256   16  202
- * 13 200ms    PRESCALE128  8  6448  199888   517120     1  1024   64  100.75
- * 14 200ms    PRESCALE128  8  6464  200384   517120     1  1024   64  101
- * 15 500ms    PRESCALE128  8 16128  499968  5160960     1  1024   64  252
- */
 
 // for 31 grid
 const uint16_t TimebaseDivPrintValues[TIMEBASE_NUMBER_OF_ENTRIES] PROGMEM = { 10, 20, 50, 101, 201, 496, 1, 2, 5, 10, 20, 50, 100,
@@ -219,12 +190,34 @@ ADC_PRESCALE8, ADC_PRESCALE8, ADC_PRESCALE16 /*496us*/, ADC_PRESCALE32, ADC_PRES
 
 const uint8_t CTCValueforTimebase[TIMEBASE_NUMBER_OF_ENTRIES - TIMEBASE_NUMBER_OF_FAST_MODES] = { 32/*496us*/, 64, 128/*2ms*/, 40,
         80/*10ms*/, 162, 101, 201, 101, 252 };
-// only for information - actual code needs 2 bytes more than code using this table, but this table takes 10 byte of RAM/Stack
+// only for information - actual code needs 2 bytes more than using this table, but this table takes 10 byte of RAM/Stack
 const uint8_t CTCPrescaleValueforTimebase[TIMEBASE_NUMBER_OF_ENTRIES - TIMEBASE_NUMBER_OF_FAST_MODES] = { TIMER0_PRESCALE8/*496us*/,
 TIMER0_PRESCALE8, TIMER0_PRESCALE8/*2ms*/, TIMER0_PRESCALE64,
 TIMER0_PRESCALE64/*10ms*/, TIMER0_PRESCALE64, TIMER0_PRESCALE256, TIMER0_PRESCALE256, TIMER0_PRESCALE1024,
 TIMER0_PRESCALE1024 };
-
+/*
+ * Overview:
+ *                            conversion
+ * idx range             clk     us    us/div  us/320  x-scale
+ * 0   10us    PRESCALE4 0.25     3.25  101.75  1040    10
+ * 1   20us    PRESCALE4 0.25     3.25  101.75  1040     5  TIMER0 CTC
+ * 2   50us    PRESCALE4 0.25     3.25  101.75  1040     2  prescaler
+ * 3  101us    PRESCALE8  0.5     6.5   201.5   2080     2      micros
+ * 4  201us    PRESCALE8  0.5     6.5   201.5   2080     1           value
+ * 5  496us    PRESCALE16   1    16     496     5120     1     8  0.5   32
+ * 6    1ms    PRESCALE32   2    32     992    10240     1     8  0.5   64
+ * 7    2ms    PRESCALE64   4    64    1984    20480     1     8  0.5  128
+ * 8    5ms    PRESCALE128  8   160    4960    51200     1    64    4   40
+ * 9   10ms    PRESCALE128  8   320    9920   102400     1    64    4   80
+ * 10  20ms    PRESCALE128  8   648   20088   207360     1    64    4  162
+ * 11  50ms    PRESCALE128  8  1616   50096   517120     1   256   16  101
+ * 12 100ms    PRESCALE128  8  3224   99944   517120     1   256   16  201.5
+ * 12 100ms    PRESCALE128  8  3216   99696   517120     1   256   16  201
+ * 12 100ms    PRESCALE128  8  3232  100192   517120     1   256   16  202
+ * 13 200ms    PRESCALE128  8  6448  199888   517120     1  1024   64  100.75
+ * 14 200ms    PRESCALE128  8  6464  200384   517120     1  1024   64  101
+ * 15 500ms    PRESCALE128  8 16128  499968  5160960     1  1024   64  252
+ */
 /*
  * storage for millis value to enable compensation for interrupt disable at signal acquisition etc.
  */
@@ -356,10 +349,7 @@ void initDisplay(void) {
     //    BlueDisplay1.setCharacterMapping(0xF8, 0x2103); // Degree Celsius in UTF16
     //BlueDisplay1.setButtonsTouchTone(TONE_PROP_BEEP_OK, 80);
     initDSOGUI();
-#if !defined(__AVR_ATmega32U4__)
-    // no frequency page in order to save space for leonardo
     initFrequencyGeneratorPage();
-#endif
 }
 
 void setup() {
@@ -388,11 +378,11 @@ void setup() {
 
     // Shutdown SPI and TWI, enable all timers, USART and ADC
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1284__) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega644__) || defined(__AVR_ATmega644A__) || defined(__AVR_ATmega644P__) || defined(__AVR_ATmega644PA__) || defined(ARDUINO_AVR_LEONARDO) || defined(__AVR_ATmega16U4__) || defined(__AVR_ATmega32U4__)
-    PRR0 = _BV(PRTWI) | _BV(PRTWI);
+    PRR0 = _BV(PRTWI)| _BV(PRTWI);
 #else
     PRR = _BV(PRTWI) | _BV(PRTWI);
 #endif
-    // Disable  digital input on all ADC channel pins to reduce power consumption for levels near half VCC
+    // Disable  digital input on all ADC channel pins to reduce power consumption
     DIDR0 = ADC0D | ADC1D | ADC2D | ADC3D | ADC4D | ADC5D;
 
     initSimpleSerial(HC_05_BAUD_RATE, false);
@@ -419,10 +409,10 @@ void setup() {
     }
 
     /*
-     * disable Timer0 and start Timer2 as replacement to maintain millis()
+     * disable Timer0 and start Timer2 as replacement
      */
-    TIMSK0 = _BV(OCIE0A); // enable timer0 Compare match A interrupt, since we need timer0 for timebase
-    initTimer2(); // start timer2 to maintain millis() (and for generating VEE - negative Voltage for external hardware)
+    TIMSK0 = _BV(OCIE0A); // enable timer0 Compare match A interrupt, in order to reset interrupt flag, since we need timer0 for timebase
+    initTimer2(); // start timer2 for generating VEE (negative Voltage for external hardware)
     if (tAttenuatorType >= ATTENUATOR_TYPE_ACTIVE_ATTENUATOR) {
         setTimer2FastPWMOutput(); // enable timer2 for output 1 kHz at Pin11 generating VEE (negative Voltage for external hardware)
     }
@@ -852,7 +842,7 @@ void acquireDataFast(void) {
         ADCSRA |= _BV(ADIF) | _BV(ADSC);
         if (!MeasurementControl.isSingleShotMode) {
             // allow millis() timer interrupts only for singleshot
-            noInterrupts();
+            cli();
         }
 
         /*
@@ -862,13 +852,15 @@ void acquireDataFast(void) {
         for (i = TRIGGER_WAIT_NUMBER_OF_SAMPLES; i != 0 || MeasurementControl.isSingleShotMode; --i) {
             digitalWriteFast(DEBUG_PIN, HIGH); // debug pulse is 1 us for (ultra fast) PRESSCALER4 and 4 us for (fast) PRESSCALER8
             // wait for free running conversion to finish
-            loop_until_bit_is_set(ADCSRA, ADIF);
-
+            while (bit_is_clear(ADCSRA, ADIF)) {
+                ;
+            }
             digitalWriteFast(DEBUG_PIN, LOW);
             // Get value
             tUValue.byte.LowByte = ADCL;
             tUValue.byte.HighByte = ADCH;
-            ADCSRA |= _BV(ADIF); // clear bit to recognize next conversion has finished
+            // without "| _BV(ADSC)" it does not work - undocumented feature???
+            ADCSRA |= _BV(ADIF) | _BV(ADSC); // clear bit to recognize next conversion has finished
 
             /*
              * detect trigger slope
@@ -901,20 +893,21 @@ void acquireDataFast(void) {
         }
     }
 
-    noInterrupts();
-    ;
+    cli();
     /*
-     * Only microseconds delay makes sense here
+     * Only microseconds delay makes sense
      */
     if (MeasurementControl.TriggerDelayMode == TRIGGER_DELAY_MICROS) {
         delayMicroseconds(MeasurementControl.TriggerDelayMillisOrMicros - TRIGGER_DELAY_MICROS_POLLING_ADJUST_COUNT);
-        ADCSRA |= _BV(ADIF);
-        loop_until_bit_is_set(ADCSRA, ADIF);
-
+        ADCSRA |= _BV(ADIF) | _BV(ADSC);
+        while (bit_is_clear(ADCSRA, ADIF)) {
+            ;
+        }
         // get first value after delay
         tUValue.byte.LowByte = ADCL;
         tUValue.byte.HighByte = ADCH;
-        ADCSRA |= _BV(ADIF); // clear bit to recognize next conversion has finished
+        // without "| _BV(ADSC)" it does not work - undocumented feature???
+        ADCSRA |= _BV(ADIF) | _BV(ADSC); // clear bit to recognize next conversion has finished
     }
 
     MeasurementControl.TriggerStatus = TRIGGER_STATUS_FOUND; // for single shot mode
@@ -948,16 +941,17 @@ void acquireDataFast(void) {
         for (i = tLoopCount; i > 1; --i) {
             uint8_t tLow, tHigh;
             digitalWriteFast(DEBUG_PIN, HIGH); // debug pulse is 1.6 us
-            loop_until_bit_is_set(ADCSRA, ADIF);
-
+            while (bit_is_clear(ADCSRA, ADIF)) {
+                ;
+            }
             digitalWriteFast(DEBUG_PIN, LOW);
             tLow = ADCL;
             tHigh = ADCH;
-            ADCSRA |= _BV(ADIF);
+            ADCSRA |= _BV(ADIF) | _BV(ADSC);
             *DataPointerFast++ = tLow;
             *DataPointerFast++ = tHigh;
         }
-        interrupts();
+        sei();
         DataPointerFast = &DataBufferControl.DataBuffer[0];
         tUValue.byte.LowByte = *DataPointerFast++;
         tUValue.byte.HighByte = *DataPointerFast++;
@@ -1002,14 +996,16 @@ void acquireDataFast(void) {
             // wait for free running conversion to finish
             // ADCSRA here is E5
             digitalWriteFast(DEBUG_PIN, HIGH); // debug pulse is 2.2 us
-            loop_until_bit_is_set(ADCSRA, ADIF);
-
+            while (bit_is_clear(ADCSRA, ADIF)) {
+                ;
+            }
             digitalWriteFast(DEBUG_PIN, LOW);
             // ADCSRA here is F5
             // duration: get Value included min 1,2 micros
             tUValue.byte.LowByte = ADCL;
             tUValue.byte.HighByte = ADCH;
-            ADCSRA |= _BV(ADIF); // clear bit to recognize next conversion has finished
+            // without "| _BV(ADSC)" it does not work - undocumented feature???
+            ADCSRA |= _BV(ADIF) | _BV(ADSC); // clear bit to recognize next conversion has finished
             //ADCSRA here is E5
         } else {
             // get values from ultra fast buffer
@@ -1019,7 +1015,7 @@ void acquireDataFast(void) {
     }
 
 // enable interrupt
-    interrupts();
+    sei();
     ADCSRA &= ~_BV(ADATE); // Disable auto-triggering
     MeasurementControl.RawValueMax = tValueMax;
     MeasurementControl.RawValueMin = tValueMin;
@@ -1539,7 +1535,7 @@ void resetOffset(void) {
 
 void setAttenuator(uint8_t aNewValue) {
     MeasurementControl.AttenuatorValue = aNewValue;
-    uint8_t tPortValue = CONTROL_PORT;  //
+    uint8_t tPortValue = CONTROL_PORT;
     tPortValue &= ~ATTENUATOR_MASK;
     tPortValue |= ((aNewValue << ATTENUATOR_SHIFT) & ATTENUATOR_MASK);
     CONTROL_PORT = tPortValue;
@@ -1622,7 +1618,7 @@ void doStartStopDSO(BDButton * aTheTouchedButton, int16_t aValue) {
         DataBufferControl.DataBufferEndPointer = &DataBufferControl.DataBuffer[DATABUFFER_SIZE - 1];
 
         // - use cli() to avoid race conditions
-        noInterrupts();
+        cli();
         if (MeasurementControl.TriggerStatus != TRIGGER_STATUS_FOUND) {
             if (MeasurementControl.TriggerMode == TRIGGER_MODE_EXTERN) {
                 // Call the external trigger event routine by software for TRIGGER_MODE_EXTERN to start reading data.
@@ -1632,7 +1628,7 @@ void doStartStopDSO(BDButton * aTheTouchedButton, int16_t aValue) {
                 MeasurementControl.TriggerStatus = TRIGGER_STATUS_FOUND;
             }
         }
-        interrupts();
+        sei();
 
         if (MeasurementControl.StopRequested) {
             /*
@@ -2290,7 +2286,7 @@ void setChannel(uint8_t aChannel) {
             tReference = INTERNAL;
         } else {
             MeasurementControl.ChannelHasActiveAttenuator = false;
-            // Set to high attenuation to protect input. Since ChannelHasActiveAttenuator = false it will not be changed by setInputRange()
+            // protect input. Since ChannelHasActiveAttenuator = false it will not be changed by setInputRange()
             setAttenuator(3);
         }
     } else if (MeasurementControl.AttenuatorType == ATTENUATOR_TYPE_FIXED_ATTENUATOR) {
@@ -2333,46 +2329,29 @@ void setReference(uint8_t aReference) {
 }
 
 void setTimer2FastPWMOutput() {
-#if defined(TCCR2A)
     OCR2A = 125 - 1; // set compare match register for 50% duty cycle
-    TCCR2A = _BV(COM2A1) | _BV(WGM21) | _BV(WGM20);// Clear OC2A/PB3/D11 on compare match, set at 00 / Fast PWM mode with 0xFF as TOP
-#else
-    OCR3A = 125 - 1; // set compare match register for 50% duty cycle
-    TCCR3A = 0; // set entire TCCR3A register to 0 - Normal mode
-    TCCR3A = _BV(WGM30); // Fast PWM, 8-bit
-    TCCR3B = 0;
-    TCCR3B = _BV(WGM32) | _BV(CS31) | _BV(CS30); // Clock/64 => 4 us. Fast PWM, 8-bit
-#endif
+    TCCR2A = _BV(COM2A1) | _BV(WGM21) | _BV(WGM20); // Clear OC2A/PB3/D11 on compare match, set at 00 / Fast PWM mode with 0xFF as TOP
 }
 
 /*
- * Square wave for VEE (-5V) generation and interrupts for Arduino millis()
+ * Square wave for VEE (-5V) generation
  */
 void initTimer2(void) {
-#if defined(TCCR2A)
-    // initialization with 0 is essential otherwise timer will not work correctly!!!
-    TCCR2A = 0;// set entire TCCR2A register to 0 - Normal mode
-    TCCR2B = 0;// same for TCCR2B
-    TCCR2B = _BV(CS22);// Clock/64 => 4 us
-#else
-    // ???initialization with 0 is essential otherwise timer will not work correctly???
-    TCCR3A = 0; // set entire TCCR3A register to 0 - Normal mode
-    TCCR3A = _BV(WGM30); // Fast PWM, 8-bit
-    TCCR3B = 0;
-    TCCR3B = _BV(WGM32) | _BV(CS31) | _BV(CS30); // Clock/64 => 4 us. Fast PWM, 8-bit
-#endif
+
+// initialization with 0 is essential otherwise timer will not work correctly!!!
+    TCCR2A = 0; // set entire TCCR1A register to 0 - Normal mode
+    TCCR2B = 0; // same for TCCR1B
+
+//    TCNT2 = 0; // init counter
+
+    TCCR2B = _BV(CS22); // Clock/64 => 4 us
     TIMSK2 = _BV(TOIE2); // Enable overflow interrupts which replaces the Arduino millis() interrupt
 }
 
 /*
  * Redirect interrupts for TIMER2 Overflow to existent arduino TIMER0 Overflow ISR
  */
-#if defined(TCCR2A)
 ISR_ALIAS(TIMER2_OVF_vect, TIMER0_OVF_vect);
-#else
-ISR_ALIAS(TIMER3_OVF_vect, TIMER0_OVF_vect);
-
-#endif
 
 #ifdef DEBUG
 void printDebugData(void) {
