@@ -409,24 +409,28 @@ void setACMode(bool aNewACMode) {
      * Handle AC hardware switching
      */
 #ifdef AVR
-    uint8_t tRelaisPin;
     if (aNewACMode) {
-        // Change AC_DC_BIAS_PIN pin to input
+        /*
+         * AC mode here: Change AC_DC_BIAS_PIN pin to input
+         */
         DDRC = 0;        // all analog channels set to input
 
         // no OffsetAutomatic for AC mode
         MeasurementControl.OffsetMode = OFFSET_MODE_0_VOLT;
         MeasurementControl.OffsetValue = 0;
-        tRelaisPin = AC_DC_RELAIS_PIN_1;
+        if (MeasurementControl.AttenuatorType < ATTENUATOR_TYPE_ACTIVE_ATTENUATOR) {
+            digitalWriteFast(AC_DC_RELAY_PIN, HIGH);
+        }
     } else {
-        // Change AC_DC_BIAS_PIN pin to output and shorten bias to 0V
+        /*
+         * DC mode here: Change AC_DC_BIAS_PIN pin to output and shorten bias to 0V
+         */
         DDRC = OUTPUT_MASK_PORTC;
         digitalWriteFast(AC_DC_BIAS_PIN, LOW);
-
-        tRelaisPin = AC_DC_RELAIS_PIN_2;
+        if (MeasurementControl.AttenuatorType < ATTENUATOR_TYPE_ACTIVE_ATTENUATOR) {
+            digitalWriteFast(AC_DC_RELAY_PIN, LOW);
+        }
     }
-// change power latching relay state
-    digitalWriteFast(tRelaisPin, HIGH);
 #else
     DSO_setACMode(aNewACMode);
 #endif
@@ -447,13 +451,6 @@ void setACMode(bool aNewACMode) {
     resetOffset();
 #else
     setOffsetGridCountAccordingToACMode();
-#endif
-
-#ifdef AVR
-// Wait for latching relay to switch - 2ms does not work reliable after reset, so take 4ms.
-    delay(4);
-// No need for relay power any more
-    digitalWriteFast(tRelaisPin, LOW);
 #endif
 }
 
@@ -1514,12 +1511,12 @@ void doTriggerMode(BDButton * aTheTouchedButton, int16_t aValue) {
         tNewMode = TRIGGER_MODE_AUTOMATIC;
         MeasurementControl.TriggerMode = tNewMode;
 #ifdef AVR
-        cli();
+        noInterrupts();
         if (EIMSK != 0) {
             // Release waiting for external trigger
             INT0_vect();
         }
-        sei();
+        interrupts();
 #endif
     }
     MeasurementControl.TriggerMode = tNewMode;
