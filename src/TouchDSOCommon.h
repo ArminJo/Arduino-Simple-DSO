@@ -24,13 +24,14 @@
  * - stop response improved for fast mode.
  * - value computation for ultra fast modes fixed.
  * - millis() timer compensation formula fixed.
+ * - AC/DC button and info line handling improved.
  */
 
 #ifdef AVR
 #else
 // No PROGMEM on ARM
 #define PROGMEM
-#define initPGM init
+#define __FlashStringHelper char
 #define setCaptionPGM setCaption
 #define drawTextPGM drawText
 #define F(a) a
@@ -95,7 +96,7 @@ extern const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNELS_WITH_FIXE
 /*****************************
  * Timebase stuff
  *****************************/
-#define TIMEBASE_INDEX_START_VALUE 7 // 2ms - shows 50 Hz
+#define TIMEBASE_INDEX_START_VALUE 7 // 2 ms - shows 50 Hz
 
 // ADC HW prescaler values
 #define ADC_PRESCALE4    2 // is noisy
@@ -120,26 +121,26 @@ extern const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNELS_WITH_FIXE
  * PRESCALE8 has pretty good quality, but PRESCALE16 (496 us/div) performs slightly better.
  *
  * Different Acquisition modes depending on Timebase:
- * Mode ultrafast  10-50us - ADC free running with PRESCALE4 - one loop for read and store 10 bit => needs double buffer space - interrupts blocked for duration of loop
- * Mode fast       101-201us - ADC free running with PRESCALE8 - one loop for read but pre process 10 -> 8 Bit and store - interrupts blocked for duration of loop
- * mode ISR        >= 496us  - ADC generates Interrupts. Waits free running with PRESCALE16 for trigger then switch to timer0 based timebase
+ * Mode ultrafast  10-50 us - ADC free running with PRESCALE4 - one loop for read and store 10 bit => needs double buffer space - interrupts blocked for duration of loop
+ * Mode fast       101-201 us - ADC free running with PRESCALE8 - one loop for read but pre process 10 -> 8 Bit and store - interrupts blocked for duration of loop
+ * mode ISR        >= 496 us  - ADC generates Interrupts. Waits free running with PRESCALE16 for trigger then switch to timer0 based timebase
  */
 
 #define HORIZONTAL_GRID_COUNT 6
 /**
  * Formula for Grid Height is:
- * 5V Reference, 10 bit Resolution => 1023/5 = 204.6 Pixel per Volt
- * 1 Volt per Grid -> 204,6 pixel. With scale (shift) 2 => 51.15 pixel.
- * 0.5 Volt -> 102.3 pixel with scale (shift) 1 => 51.15 pixel
- * 0.2 Volt -> 40.96 pixel
- * 1.1V Reference 1023/1.1 = 930 Pixel per Volt
- * 0.2 Volt -> 186 pixel with scale (shift) 2 => 46.5 pixel
- * 0.1 Volt -> 93 pixel with scale (shift) 1 => 46.5 pixel
- * 0.05 Volt -> 46.5 pixel
+ * 5 volt Reference, 10 bit Resolution => 1023/5 = 204.6 Pixel per volt
+ * 1 volt per Grid -> 204,6 pixel. With scale (shift) 2 => 51.15 pixel.
+ * 0.5 volt -> 102.3 pixel with scale (shift) 1 => 51.15 pixel
+ * 0.2 volt -> 40.96 pixel
+ * 1.1 volt Reference 1023/1.1 = 930 Pixel per volt
+ * 0.2 volt -> 186 pixel with scale (shift) 2 => 46.5 pixel
+ * 0.1 volt -> 93 pixel with scale (shift) 1 => 46.5 pixel
+ * 0.05 volt -> 46.5 pixel
  */
 
-#define HORIZONTAL_GRID_HEIGHT_1_1V_SHIFT8 11904 // 46.5*256 for 0.05 to 0.2 Volt/div for 6 divs per screen
-#define HORIZONTAL_GRID_HEIGHT_2V_SHIFT8 6554 // 25.6*256 for 0.05 to 0.2 Volt/div for 10 divs per screen
+#define HORIZONTAL_GRID_HEIGHT_1_1V_SHIFT8 11904 // 46.5*256 for 0.05 to 0.2 volt/div for 6 divs per screen
+#define HORIZONTAL_GRID_HEIGHT_2V_SHIFT8 6554 // 25.6*256 for 0.05 to 0.2 volt/div for 10 divs per screen
 #define ADC_CYCLES_PER_CONVERSION 13
 #define TIMING_GRID_WIDTH 31 // with 31 instead of 32 the values fit better to 1-2-5 timebase scale
 #define TIMEBASE_NUMBER_OF_ENTRIES 15 // the number of different timebases provided
@@ -148,7 +149,7 @@ extern const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNELS_WITH_FIXE
 #define TIMEBASE_INDEX_ULTRAFAST_MODES 2 // first 3 timebase (10 - 50) using PRESCALE4 is ultra fast polling without preprocessing and therefore needs double buffer size
 #define TIMEBASE_NUMBER_OF_XSCALE_CORRECTION 4  // number of timebase which are simulated by display XSale factor. Since PRESCALE4 gives bad quality, use PRESCALE8 and XScale for 201 us range
 #define TIMEBASE_INDEX_MILLIS 6 // min index to switch to ms instead of us display
-#define TIMEBASE_INDEX_DRAW_WHILE_ACQUIRE 11 // min index where chart is drawn while buffer is filled (11 => 50ms)
+#define TIMEBASE_INDEX_DRAW_WHILE_ACQUIRE 11 // min index where chart is drawn while buffer is filled (11 => 50 ms)
 #else
 /*
  * TIMEBASE
@@ -347,6 +348,7 @@ void drawDSOSettingsPage(void);
 void drawDSOMoreSettingsPage(void);
 
 void drawGridLinesWithHorizLabelsAndTriggerLine();
+void clearHorizontalLineAndRestoreGrid(int aYposition);
 void drawTriggerLine(void);
 void drawMinMaxLines(void);
 void clearTriggerLine(uint8_t aTriggerLevelDisplayValue);
@@ -372,7 +374,7 @@ void printInfo(bool aRecomputeValues = true);
 void printTriggerInfo(void);
 
 // GUI event handler section
-void doTouchUp(struct TouchEvent * const aTochPosition);
+void doSwitchInfoModeOnTouchUp(struct TouchEvent * const aTochPosition);
 void doLongTouchDownDSO(struct TouchEvent * const aTochPosition);
 void doSwipeEndDSO(struct Swipe * const aSwipeInfo);
 void doSetTriggerDelay(float aValue);

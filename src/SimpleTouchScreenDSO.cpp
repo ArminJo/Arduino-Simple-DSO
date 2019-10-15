@@ -37,7 +37,7 @@
  *      Gesture (swipe) control of timebase and chart.
  *      All AVR ADC input channels selectable.
  *      Touch trigger level select.
- *      1.1 Volt internal reference. 5 Volt (VCC) also usable.
+ *      1.1 volt internal reference. 5 volt (VCC) also usable.
  *
  *      The code can also be used as an example of C++/Assembler coding
  *      and complex interrupt handling routine
@@ -57,7 +57,7 @@
  *      Horizontal swipe on chart page changes timebase while running, else scrolls the data chart.
  *      Vertical swipe on chart page changes the range if manual range is enabled.
  *
- *      Settings:
+ *      Buttons at the settings page:
  *      "Trigger man timeout" means manual trigger value, but with timeout, i.e. if trigger condition not met, new data is shown after timeout.
  *          - This is not really a manual trigger level mode, but it helps to find the right trigger value.
  *      "Trigger man" means manual trigger, but without timeout, i.e. if trigger condition not met, no new data is shown.
@@ -75,7 +75,7 @@
  *
  * Attenuator circuit and AC/DC switch
  *
- *                ADC INPUT_0  1.1 Volt         ADC INPUT_1 11 Volt        ADC INPUT_2 110 Volt
+ *                ADC INPUT_0  1.1 volt         ADC INPUT_1 11 volt        ADC INPUT_2 110 volt
  *                      /\                         /\     ______              /\    ______
  *                      |                          +-----| 220k |----+        +----| 10k  |-----------+
  *                      |     _______              |      ______     |        |     ------            |
@@ -89,11 +89,11 @@
  *       VREF           |                 |        |                 |        |             |         |
  *         /\           +----+            |        +----+            |        +----+        +----+    |
  *         |            |    |            |        |    |            |        |    |        |    |    |
- *         _            |    = C 0.1uF    |        |    = C 0.1uF    |        |    = 0.1uF  |    = 0.1uF  400 Volt
+ *         _            |    = C 0.1uF    |        |    = C 0.1uF    |        |    = 0.1uF  |    = 0.1uF  400 volt
  *        | |           |    |            |        |    |            |        |    |        |    |    |
  *        | | 100k      O    O            |        O    O            |        O    O        O    O    |
  *        | |          DC   AC            |       DC   AC            |       DC   AC       DC   AC    |
- *         -                              |                          |                    1000V Range |
+ *         -                              |                          |                   1000 V Range |
  *         |                              |                          |                                |
  *   A5 ---+-------------+----------------+--------------------------+--------------------------------+
  * AC bias |             |
@@ -104,7 +104,7 @@
  *         -             |            |   ------      |                 | |
  *         |             |            = 100nF         |                 | | 100k
  *         |             |            |               O                 |_|
- *  GND ---+-------------+------------+      SquareWave 0.1 - 8MHz       |                                                     -
+ *  GND ---+-------------+------------+      SquareWave 0.1 - 8 MHz      |                                                     -
  *                                                                       O
  *                                                                External_Trigger
  *
@@ -112,7 +112,7 @@
  */
 
 /*
- * Attention: since 5.0 / 1024.0 = 0,004883 Volt is the resolution of the ADC, depending of scale factor:
+ * Attention: since 5.0 / 1024.0 = 0,004883 volt is the resolution of the ADC, depending of scale factor:
  * 1. The output values for 2 adjacent display (min/max) values can be identical
  * 2. The voltage picker value may not reflect the real sample value (e.g. shown for min/max)
  */
@@ -123,12 +123,12 @@
  * 3   Not yet used
  * 4   - If active attenuator, attenuator range control, else not yet used
  * 5   - If active attenuator, attenuator range control, else not yet used
- * 6   - If active attenuator, AC (high) / DC (low) relay, else debug output of half the timebase of Timer 0 for range 496us and higher -> frequency <= 31,25kHz (see changeTimeBaseValue())
+ * 6   - If active attenuator, AC (high) / DC (low) relay, else debug output of half the timebase of Timer 0 for range 496 us and higher -> frequency <= 31,25 kHz (see changeTimeBaseValue())
  * 7   Not yet used
  * 8    Attenuator configuration input with internal pullup - bit 0
  * 9    Attenuator configuration input with internal pullup - bit 1  11-> no attenuator attached, 10-> simple (channel 0-2) attenuator attached, 0x-> active (channel 0-1) attenuator attached
  * 10   Frequency / waveform generator output of Timer1 (16 bit)
- * 11  - If active attenuator, square wave for VEE (-5V) generation by timer2 output, else not yet used
+ * 11  - If active attenuator, square wave for VEE (-5 volt) generation by timer2 output, else not yet used
  * 12  Not yet used
  * 13   Internal LED / timing debug output
  *
@@ -157,7 +157,7 @@
  * Buttons
  *********************/
 
-BDButton TouchButtonBackSmall;
+BDButton TouchButtonBack;
 // global flag for page control. Is evaluated by calling loop or page and set by buttonBack handler
 bool sBackButtonPressed;
 
@@ -328,7 +328,7 @@ void drawRemainingDataBufferValues(void);
 float getTemperature(void);
 void setVCCValue(void);
 inline void setPrescaleFactor(uint8_t aFactor);
-void setReference(uint8_t aReference);
+void setADCReference(uint8_t aReference);
 void setTimer2FastPWMOutput();
 void initTimer2(void);
 
@@ -373,7 +373,7 @@ void setup() {
     pinMode(ATTENUATOR_DETECT_PIN_1, INPUT_PULLUP);
 
     // Set outputs at port C
-    // For DC mode, change AC_DC_BIAS_PIN pin to output and set bias to 0V
+    // For DC mode, change AC_DC_BIAS_PIN pin to output and set bias to 0 volt
     DDRC = OUTPUT_MASK_PORTC;
     digitalWriteFast(AC_DC_BIAS_PIN, LOW);
 
@@ -414,9 +414,9 @@ void setup() {
      * disable Timer0 and start Timer2 as replacement to maintain millis()
      */
     TIMSK0 = _BV(OCIE0A); // enable timer0 Compare match A interrupt, since we need timer0 for timebase
-    initTimer2(); // start timer2 to maintain millis() (and for generating VEE - negative Voltage for external hardware)
+    initTimer2(); // start timer2 to maintain millis() (and for generating VEE - negative voltage for external hardware)
     if (tAttenuatorType >= ATTENUATOR_TYPE_ACTIVE_ATTENUATOR) {
-        setTimer2FastPWMOutput(); // enable timer2 for output 1 kHz at Pin11 generating VEE (negative Voltage for external hardware)
+        setTimer2FastPWMOutput(); // enable timer2 for output 1 kHz at Pin11 generating VEE (negative voltage for external hardware)
     }
 
     MeasurementControl.TimebaseIndex = 0;
@@ -484,7 +484,7 @@ void setup() {
     // Register callback handler and check for connection
     BlueDisplay1.initCommunication(&initDisplay, &redrawDisplay);
     registerSwipeEndCallback(&doSwipeEndDSO);
-    registerTouchUpCallback(&doTouchUp);
+    registerTouchUpCallback(&doSwitchInfoModeOnTouchUp);
     registerLongTouchDownCallback(&doLongTouchDownDSO, 900);
 
     BlueDisplay1.playFeedbackTone(FEEDBACK_TONE_OK);
@@ -530,7 +530,7 @@ void __attribute__((noreturn)) loop(void) {
                      */
 
                     /*
-                     * Enable timer 0 overflow interrupt again
+                     * Enable Timer0 overflow interrupt again
                      * and compensate for missing ticks because timer was disabled not to disturb acquisition.
                      * 320.0 / 31.0 = divs per screen
                      * 4 * 256 = micro seconds per interrupt
@@ -1240,7 +1240,7 @@ ISR(ADC_vect) {
             if (MeasurementControl.TimebaseIndex == 7) {
                 a4Microseconds = 47 * 4;
             }
-            // the following loop takes 4 cycles (1/4 microseconds  at 16MHz) per iteration
+            // the following loop takes 4 cycles (1/4 microseconds  at 16 MHz) per iteration
             __asm__ __volatile__ (
                     "1: sbiw %0,1" "\n\t"    // 2 cycles
                     "brne .-4" : "=w" (a4Microseconds) : "0" (a4Microseconds)// 2 cycles
@@ -1368,20 +1368,20 @@ void setInputRange(uint8_t aShiftValue, uint8_t aActiveAttenuatorValue) {
 
     if (MeasurementControl.ADCReference == DEFAULT) {
         /*
-         * 5 Volt reference
+         * 5 volt reference
          */
         if (aShiftValue == 0) {
-            // formula for 5V and 0.2V / div and shift 0 is: ((1023/5V)*0.2) * 256/2^shift = 52377.6 / 5
+            // formula for 5 volt and 0.2 volt / div and shift 0 is: ((1023/5 volt)*0.2) * 256/2^shift = 52377.6 / 5
             tHorizontalGridSizeShift8 = (52377.6 / MeasurementControl.VCC);
             tNewGridVoltage = 0.2;
         } else {
-            // formula for 5V and 0.5V / div and shift 1 is: ((1023/5V)*0.5) * 256/2^shift = (130944/2) / 5
+            // formula for 5 volt and 0.5 volt / div and shift 1 is: ((1023/5 volt)*0.5) * 256/2^shift = (130944/2) / 5
             tHorizontalGridSizeShift8 = (65472.0 / MeasurementControl.VCC);
             tNewGridVoltage = 0.5 * aShiftValue;
         }
     } else {
         /*
-         * 1.1 Volt reference
+         * 1.1 volt reference
          */
         if (MeasurementControl.ChannelHasActiveAttenuator) {
             tHorizontalGridSizeShift8 = HORIZONTAL_GRID_HEIGHT_2V_SHIFT8;
@@ -1583,7 +1583,7 @@ void setAttenuator(uint8_t aNewValue) {
 
 uint16_t getAttenuatorFactor(void) {
     uint16_t tRetValue = 1;
-//    if (MeasurementControl.ChannelHasACDCSwitch) {
+//    if (MeasurementControl.ChannelHasAC_DCSwitch) {
     for (int i = 0; i < MeasurementControl.AttenuatorValue; ++i) {
         tRetValue *= ATTENUATOR_FACTOR;
     }
@@ -1597,7 +1597,7 @@ uint16_t getAttenuatorFactor(void) {
 /*
  * toggle between DC and AC mode
  */
-void doAcDcMode(__attribute__((unused))                      BDButton * aTheTouchedButton, __attribute__((unused))                      int16_t aValue) {
+void doAcDcMode(__attribute__((unused)) BDButton * aTheTouchedButton, __attribute__((unused)) int16_t aValue) {
     setACMode(!MeasurementControl.ChannelIsACMode);
 }
 
@@ -1629,16 +1629,16 @@ void doSetTriggerDelay(float aValue) {
 }
 
 /*
- * toggle between 5 and 1.1 Volt reference
+ * toggle between 5 and 1.1 volt reference
  */
-void doADCReference(__attribute__((unused))                      BDButton * aTheTouchedButton, __attribute__((unused))                      int16_t aValue) {
+void doADCReference(__attribute__((unused)) BDButton * aTheTouchedButton, __attribute__((unused)) int16_t aValue) {
     uint8_t tNewReference = MeasurementControl.ADCReference;
     if (MeasurementControl.ADCReference == DEFAULT) {
         tNewReference = INTERNAL;
     } else {
         tNewReference = DEFAULT;
     }
-    setReference(tNewReference);
+    setADCReference(tNewReference); // switch hardware
     setReferenceButtonCaption();
     if (!MeasurementControl.RangeAutomatic) {
         // set new grid values
@@ -1646,7 +1646,7 @@ void doADCReference(__attribute__((unused))                      BDButton * aThe
     }
 }
 
-void doStartStopDSO(__attribute__((unused))                      BDButton * aTheTouchedButton, __attribute__((unused))                      int16_t aValue) {
+void doStartStopDSO(__attribute__((unused)) BDButton * aTheTouchedButton, __attribute__((unused)) int16_t aValue) {
     if (MeasurementControl.isRunning) {
         /*
          * Stop here
@@ -1904,8 +1904,8 @@ void printInfo(bool aRecomputeValues) {
         tReferenceChar = '5';
         tRefMultiplier *= MeasurementControl.VCC / 1024.0;
         /*
-         * Use 1023 to get 5V display for full scale reading
-         * Better would be 5.0 / 1024.0; since the reading for value for 5V- 1LSB is also 1023,
+         * Use 1023 to get 5 volt display for full scale reading
+         * Better would be 5.0 / 1024.0; since the reading for value for 5 volt- 1 LSB is also 1023,
          * but this implies that the maximum displayed value is 4.99(51171875) :-(
          */
     } else {
@@ -1949,7 +1949,7 @@ void printInfo(bool aRecomputeValues) {
 
     if (DisplayControl.showInfoMode == INFO_MODE_LONG_INFO) {
         /*
-         * Long version 1. line Timebase, Channel, (min, average, max, peak to peak) Voltage, Trigger, Reference.
+         * Long version 1. line Timebase, Channel, (min, average, max, peak to peak) voltage, Trigger, Reference.
          */
         sprintf_P(sStringBuffer, PSTR("%3u%cs %c      %s %s %s P2P%sV %sV %c"), tTimebaseUnitsPerGrid, tTimebaseUnitChar,
                 tSlopeChar, tMinStringBuffer, tAverageStringBuffer, tMaxStringBuffer, tP2PStringBuffer, tTriggerStringBuffer,
@@ -2030,8 +2030,8 @@ void printTriggerInfo(void) {
     if (MeasurementControl.ADCReference == DEFAULT) {
         tRefMultiplier *= MeasurementControl.VCC / 1024.0;
         /*
-         * Use 1023 to get 5V display for full scale reading
-         * Better would be 5.0 / 1024.0; since the reading for value for 5V- 1LSB is also 1023,
+         * Use 1023 to get 5 volt display for full scale reading
+         * Better would be 5.0 / 1024.0; since the reading for value for 5 volt- 1 LSB is also 1023,
          * but this implies that the maximum displayed value is 4.99(51171875) :-(
          */
     } else {
@@ -2075,7 +2075,7 @@ void printVCCAndTemperature(void) {
         setVCCValue();
         dtostrf(MeasurementControl.VCC, 4, 2, &sStringBuffer[30]);
 
-        sprintf_P(sStringBuffer, PSTR("%s Volt %s\xB0" "C"), &sStringBuffer[30], &sStringBuffer[40]);
+        sprintf_P(sStringBuffer, PSTR("%s volt %s\xB0" "C"), &sStringBuffer[30], &sStringBuffer[40]);
         BlueDisplay1.drawText(BUTTON_WIDTH_3_POS_2, SETTINGS_PAGE_INFO_Y, sStringBuffer,
         TEXT_SIZE_11, COLOR_BLACK, COLOR_BACKGROUND_DSO);
     }
@@ -2187,7 +2187,7 @@ uint8_t changeTimeBaseValue(int8_t aChangeIndexValue) {
      * Try to have the time for showing one display as trigger timeout
      * Don't go below 1/10 of a second (30 * 256 samples) and above 3 seconds (900)
      * 10 ms Range => timeout = 100 millisecond
-     * 20 ms => 200ms, 50 ms => 500ms, 100 ms => 1s, 200 ms => 2s, 500 ms => 3s
+     * 20 ms => 200 ms, 50 ms => 500 ms, 100 ms => 1s, 200 ms => 2s, 500 ms => 3s
      * Trigger is always running with ADC at free running mode at 1 us clock => 13 us per conversion
      * which gives 77k samples for 1 second
      */
@@ -2254,7 +2254,7 @@ uint16_t getInputRawFromDisplayValue(uint8_t aDisplayValue) {
     return aValue16;
 }
 /*
- * computes corresponding voltage from display y position (DISPLAY_HEIGHT - 1 -> 0 Volt)
+ * computes corresponding voltage from display y position (DISPLAY_HEIGHT - 1 -> 0 volt)
  */
 float getFloatFromDisplayValue(uint8_t aDisplayValue) {
     float tFactor;
@@ -2310,21 +2310,24 @@ void setVCCValue(void) {
  *  */
 void setChannel(uint8_t aChannel) {
     MeasurementControl.ADCInputMUXChannelIndex = aChannel;
+    /*
+     * Set default values for plain inputs without attenuator but potential AC/DC capabilities
+     */
     MeasurementControl.ShiftValue = 2;
     bool tIsACMode = false;
     MeasurementControl.AttenuatorValue = 0; // no attenuator attached at channel
-//    uint8_t tHasACDC = false;
-    uint8_t tReference = DEFAULT; // DEFAULT/1 -> VCC   INTERNAL/3 -> 1.1V
+    uint8_t tHasAC_DC = true;
+    uint8_t tReference = DEFAULT; // DEFAULT/1 -> VCC   INTERNAL/3 -> 1.1 volt
 
     if (MeasurementControl.AttenuatorType >= ATTENUATOR_TYPE_ACTIVE_ATTENUATOR) {
         if (aChannel < NUMBER_OF_CHANNEL_WITH_ACTIVE_ATTENUATOR) {
             MeasurementControl.ChannelHasActiveAttenuator = true;
-//            tHasACDC = true;
             // restore AC mode for this channels
             tIsACMode = MeasurementControl.isACMode;
             // use internal reference if attenuator is available
             tReference = INTERNAL;
         } else {
+            tHasAC_DC = false;
             MeasurementControl.ChannelHasActiveAttenuator = false;
             // Set to high attenuation to protect input. Since ChannelHasActiveAttenuator = false it will not be changed by setInputRange()
             setAttenuator(3);
@@ -2332,27 +2335,28 @@ void setChannel(uint8_t aChannel) {
     } else if (MeasurementControl.AttenuatorType == ATTENUATOR_TYPE_FIXED_ATTENUATOR) {
         if (aChannel < NUMBER_OF_CHANNELS_WITH_FIXED_ATTENUATOR) {
             MeasurementControl.AttenuatorValue = aChannel; // channel 0 has 10^0 attenuation factor etc.
-            //           tHasACDC = true;
             // restore AC mode for this channels
             tIsACMode = MeasurementControl.isACMode;
             tReference = INTERNAL;
         }
     }
-    MeasurementControl.ChannelIsACMode = tIsACMode;
-//    MeasurementControl.ChannelHasACDCSwitch = tHasACDC;
-    MeasurementControl.ADCReference = tReference;
-    setReferenceButtonCaption();
 
     /*
      * Map channel index to special channel numbers
      */
     if (aChannel == MAX_ADC_EXTERNAL_CHANNEL + 1) {
         aChannel = ADC_TEMPERATURE_CHANNEL; // Temperature
+        tHasAC_DC = false;
     }
     if (aChannel == MAX_ADC_EXTERNAL_CHANNEL + 2) {
         aChannel = ADC_1_1_VOLT_CHANNEL; // 1.1 Reference
+        tHasAC_DC = false;
     }
     ADMUX = aChannel | (tReference << REFS0);
+
+    MeasurementControl.ChannelIsACMode = tIsACMode;
+    MeasurementControl.ChannelHasAC_DCSwitch = tHasAC_DC;
+    MeasurementControl.ADCReference = tReference;
 
 //the second parameter for active attenuator is only needed if ChannelHasActiveAttenuator == true
     setInputRange(2, 2);
@@ -2362,8 +2366,8 @@ inline void setPrescaleFactor(uint8_t aFactor) {
     ADCSRA = (ADCSRA & ~0x07) | aFactor;
 }
 
-// DEFAULT/1 -> VCC   INTERNAL/3 -> 1.1V
-void setReference(uint8_t aReference) {
+// DEFAULT/1 -> VCC   INTERNAL/3 -> 1.1  volt
+void setADCReference(uint8_t aReference) {
     MeasurementControl.ADCReference = aReference;
     ADMUX = (ADMUX & ~0xC0) | (aReference << REFS0);
 }
@@ -2382,7 +2386,7 @@ void setTimer2FastPWMOutput() {
 }
 
 /*
- * Square wave for VEE (-5V) generation and interrupts for Arduino millis()
+ * Square wave for VEE (-5 volt) generation and interrupts for Arduino millis()
  */
 void initTimer2(void) {
 #if defined(TCCR2A)

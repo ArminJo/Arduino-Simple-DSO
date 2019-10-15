@@ -14,7 +14,10 @@
 /****************************************************************************
  * Change this if you have reprogrammed the hc05 module for other baud rate
  ***************************************************************************/
-#define HC_05_BAUD_RATE BAUD_115200
+#ifndef HC_05_BAUD_RATE
+//#define HC_05_BAUD_RATE BAUD_115200
+#define HC_05_BAUD_RATE BAUD_9600
+#endif
 
 #define MILLIS_BETWEEN_INFO_OUTPUT 1000
 
@@ -33,7 +36,7 @@ const unsigned int REMOTE_DISPLAY_WIDTH = 320;
 #define ATTENUATOR_DETECT_PIN_0 8 // PortB0 in INPUT_PULLUP mode
 #define ATTENUATOR_DETECT_PIN_1 9 // PortB1 in INPUT_PULLUP mode
 #define TIMER_1_OUTPUT_PIN 10 // Frequency generation OC1B TIMER1
-#define VEE_PIN 11 // // PortB3 OC2A TIMER2 Square wave for VEE (-5V) generation
+#define VEE_PIN 11 // // PortB3 OC2A TIMER2 Square wave for VEE (-5 volt) generation
 #define DEBUG_PIN 13 // PortB5 PIN 13
 
 /*
@@ -115,14 +118,17 @@ struct MeasurementControlStruct {
     bool isSingleShotMode;
 
     float VCC; // Volt of VCC
-    uint8_t ADCReference; // DEFAULT = 1 =VCC   INTERNAL = 3 = 1.1V
+    uint8_t ADCReference; // DEFAULT = 1 =VCC   INTERNAL = 3 = 1.1 volt
 
     // Input select
     uint8_t ADCInputMUXChannelIndex;
     uint8_t AttenuatorType; //ATTENUATOR_TYPE_NO_ATTENUATOR, ATTENUATOR_TYPE_SIMPLE_ATTENUATOR, ATTENUATOR_TYPE_ACTIVE_ATTENUATOR
     bool ChannelHasActiveAttenuator;
-    bool ChannelIsACMode; // AC Mode for actual channel
-    bool isACMode; // user AC mode setting
+
+    // AC / DC Switch
+    bool ChannelHasAC_DCSwitch; // has AC / DC switch - only for channels with active or passive attenuators. Is at least false for TEMP and REF channels
+    bool ChannelIsACMode;   // AC Mode for actual channel
+    bool isACMode;          // storage for user AC mode setting used to restore AC mode when switching back from channel without AC capabilities.
     uint16_t RawDSOReadingACZero;
 
     // Trigger
@@ -167,9 +173,9 @@ struct MeasurementControlStruct {
     uint16_t OffsetValue;
     uint8_t AttenuatorValue; // 0 for direct input or channels without attenuator, 1 -> factor 10, 2 -> factor 100, 3 -> input shortcut
     uint8_t ShiftValue; // shift (division) value  (0-2) for different voltage ranges
-    uint16_t HorizontalGridSizeShift8; // depends on shift  for 5V reference 0,02 -> 41 other -> 51.2
+    uint16_t HorizontalGridSizeShift8; // depends on shift  for 5 volt reference 0,02 -> 41 other -> 51.2
     float HorizontalGridVoltage; // voltage per grid for offset etc.
-    int8_t OffsetGridCount; // number of bottom line for offset != 0 Volt.
+    int8_t OffsetGridCount; // number of bottom line for offset != 0 volt.
     uint32_t TimestampLastRangeChange;
 };
 
@@ -238,7 +244,7 @@ extern "C" void INT0_vect();
 #endif
 extern char sStringBuffer[SIZEOF_STRINGBUFFER];
 
-extern BDButton TouchButtonBackSmall;
+extern BDButton TouchButtonBack;
 // global flag for page control. Is evaluated by calling loop or page and set by buttonBack handler
 extern bool sBackButtonPressed;
 
