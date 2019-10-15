@@ -1,6 +1,7 @@
 # Arduino-Simple-DSO
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Hit Counter](https://hitcounter.pythonanywhere.com/count/tag.svg?url=https%3A%2F%2Fgithub.com%2FArminJo%2FArduino-Simple-DSO)](https://github.com/brentvollebregt/hit-counter)
 
 ## SUMMARY
 This DSO needs only a standard Arduino-Uno or Arduino-Nano, a HC-05 Bluetooth module a few resistors and capacitators and this software.
@@ -107,7 +108,7 @@ The stack size is needed for testing different buffer size values during develop
   - **Ref 1.1V** (recommended if having attenuators) -> uses the internal 1.1 volt reference for the ADC.
   - **Ref VCC** -> uses VCC (5 volt supply) as reference for the ADC.
 
-## INfO LINE REFERENCE
+## INFO LINE REFERENCE
 ### SHORT INFO
 - Arithmetic-average and peak to peak voltage of actual chart (In analyze mode, chart is longer than the display!)
 - Frequency
@@ -162,8 +163,8 @@ DSO start screen
 # SCHEMATICS
 | SIMPLE 1 RANGE VERSION | 3 RANGE VERSION |
 | :-: | :-: |
-| ![Fritzing schematic](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Simple_Schaltplan.png) | ![Fritzing schematic](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Schaltplan.png) |
-| ![Fritzing breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Simple_Steckplatine.png) | ![Fritzing breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Steckplatine.png) |
+| ![Fritzing schematic](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Simple_Schaltplan.png) | ![Fritzing schematic](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_BT_Schaltplan.png) |
+| ![Fritzing breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Simple_Steckplatine.png) | ![Fritzing breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_BT_Steckplatine.png) |
 | ![DSO with passive attenuator on breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/media/ArduinoDSO_Simple.jpg) | ![DSO with passive attenuator on breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/media/ArduinoDSO.jpg) |
 
 # Revision History
