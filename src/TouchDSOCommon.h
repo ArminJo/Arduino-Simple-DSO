@@ -17,16 +17,6 @@
 #include "FrequencyGeneratorPage.h"
 #endif
 
-// Internal version
-#define VERSION_DSO "3.1"
-/*
- * Version 3.1
- * - stop response improved for fast mode.
- * - value computation for ultra fast modes fixed.
- * - millis() timer compensation formula fixed.
- * - AC/DC button and info line handling improved.
- */
-
 #ifdef AVR
 #else
 // No PROGMEM on ARM
@@ -51,16 +41,6 @@
 
 #define DISPLAY_VALUE_FOR_ZERO (REMOTE_DISPLAY_HEIGHT - 1)
 //#define DISPLAY_VALUE_FOR_ZERO (REMOTE_DISPLAY_HEIGHT - 2) // Zero line is not exactly at bottom of display to improve readability
-
-//Line colors
-#define COLOR_VOLTAGE_PICKER COLOR_YELLOW
-#define COLOR_VOLTAGE_PICKER_SLIDER RGB(0xFF,0XFF,0xE0) // Light Yellow
-#define COLOR_TRIGGER_LINE COLOR_PURPLE
-#define COLOR_TRIGGER_SLIDER RGB(0xFF,0XF0,0xFF) // light Magenta
-
-#define COLOR_MAX_MIN_LINE COLOR_GREEN
-#define COLOR_HOR_GRID_LINE_LABEL COLOR_BLUE
-#define COLOR_HOR_GRID_LINE_LABEL_NEGATIVE COLOR_RED
 
 /*
  * CHANNEL
@@ -313,6 +293,7 @@ extern BDSlider TouchSliderVoltagePicker;
 void startAcquisition(void);
 void prepareForStart(void);
 void setChannel(uint8_t aChannel);
+void clearDataBuffer();
 
 // Stack info
 void initStackFreeMeasurement(void);

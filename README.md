@@ -8,7 +8,7 @@ This DSO needs only a standard Arduino-Uno or Arduino-Nano, a HC-05 Bluetooth mo
 
 | Simple DSO with no attenuator on breadboard | DSO Chart screen |
 | :-: | :-: |
-| ![DSO with passive attenuator on breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/media/ArduinoDSO_Simple.jpg) | ![DSO chart screen](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/media/Chart.jpg) |
+| ![DSO with passive attenuator on breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/pictures/ArduinoDSO_simple.jpg) | ![DSO chart screen](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/pictures/Chart.jpg) |
 
 ## Features
 - 150 kSamples per second with good quality.
@@ -151,23 +151,30 @@ and waveform frequency is not stable and decreased, since not all TIMER1 OVERFLO
 
 # SCREENSHOTS
 DSO start screen
-![DSO start screen](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/media/Welcome.jpg)
+![DSO start screen](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/pictures/Welcome.jpg)
 
 | DSO Chart screen | DSO Chart screen with long info |
 | :-: | :-: |
-| ![DSO chart screen](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/media/Chart.jpg) | ![DSO chart screen with long info](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/media/Chart_Long_Info.jpg) |
+| ![DSO chart screen](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/pictures/Chart.jpg) | ![DSO chart screen with long info](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/pictures/Chart_Long_Info.jpg) |
 | DSO settings menu | DSO frequency / waveform generator menu |
-| ![DSO settings menu](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/media/Settings_Passive_Attenuator.jpg) | ![Frequency / waveform generator menu](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/media/Frequency.jpg) |
+| ![DSO settings menu](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/pictures/Settings_Passive_Attenuator.jpg) | ![Frequency / waveform generator menu](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/pictures/Frequency.jpg) |
 | ![DSO at work](https://github.com/ArminJo/android-blue-display/blob/gh-pages/pictures/DSO+Tablet.jpg) |  |
 
 # SCHEMATICS
 | SIMPLE 1 RANGE VERSION | 3 RANGE VERSION |
 | :-: | :-: |
-| ![Fritzing schematic](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Simple_Schaltplan.png) | ![Fritzing schematic](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_BT_Schaltplan.png) |
-| ![Fritzing breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_Simple_Steckplatine.png) | ![Fritzing breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_BT_Steckplatine.png) |
-| ![DSO with passive attenuator on breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/media/ArduinoDSO_Simple.jpg) | ![DSO with passive attenuator on breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/media/ArduinoDSO.jpg) |
+| ![Fritzing schematic](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_simple_Schaltplan.png) | ![Fritzing schematic](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_BT_full_Schaltplan.png) |
+| ![Fritzing breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_simple_Steckplatine.png) | ![Fritzing breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/fritzing/Arduino_Nano_DSO_BT_full_Steckplatine.png) |
+| ![DSO with passive attenuator on breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/pictures/ArduinoDSO_simple.jpg) | ![DSO with passive attenuator on breadboard](https://github.com/ArminJo/Arduino-Simple-DSO/blob/master/pictures/ArduinoDSO.jpg) |
 
 # Revision History
-### Version 1.0.0
-Initial Arduino library version
+### Version 3.2 - 11/2019
+- Clear display buffer at start and at switching inputs.
+- Multiline button caption.
+
+### Version 3.1
+- stop response improved for fast mode.
+- value computation for ultra fast modes fixed.
+- millis() timer compensation formula fixed.
+- AC/DC button and info line handling improved.
 

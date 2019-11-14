@@ -11,6 +11,20 @@
 
 #include "TouchDSOCommon.h"
 
+// Internal version
+#define VERSION_DSO "3.2"
+/*
+ * Version 3.2 - 11/2019
+ * - Clear display buffer at start and at switching inputs.
+ * - Multiline button caption.
+ *
+ * Version 3.1
+ * - stop response improved for fast mode.
+ * - value computation for ultra fast modes fixed.
+ * - millis() timer compensation formula fixed.
+ * - AC/DC button and info line handling improved.
+ */
+
 /****************************************************************************
  * Change this if you have reprogrammed the hc05 module for other baud rate
  ***************************************************************************/
@@ -73,11 +87,18 @@ const unsigned int REMOTE_DISPLAY_WIDTH = 320;
 // to see old chart values
 #define COLOR_DATA_HISTORY RGB(0x20,0xFF,0x20)
 
-//Line colors
+// Line colors
+#define COLOR_VOLTAGE_PICKER COLOR_YELLOW
+#define COLOR_VOLTAGE_PICKER_SLIDER RGB(0xFF,0XFF,0xD0) // Light Yellow
 #define COLOR_TRIGGER_LINE COLOR_PURPLE
-#define COLOR_TRIGGER_SLIDER RGB(0xFF,0XF0,0xFF)
+#define COLOR_TRIGGER_SLIDER RGB(0xFF,0XE8,0xFF) // light Magenta
 #define COLOR_HOR_REF_LINE_LABEL COLOR_BLUE
+#define COLOR_MAX_MIN_LINE COLOR_GREEN
 #define COLOR_GRID_LINES RGB(0x00,0x98,0x00)
+
+// Label colors
+#define COLOR_HOR_GRID_LINE_LABEL COLOR_BLUE
+#define COLOR_HOR_GRID_LINE_LABEL_NEGATIVE COLOR_RED
 
 // GUI element colors
 #define COLOR_GUI_CONTROL RGB(0xE8,0x00,0x00)
