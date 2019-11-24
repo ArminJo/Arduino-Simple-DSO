@@ -169,12 +169,12 @@ DSO start screen
 
 # Revision History
 ### Version 3.2 - 11/2019
-- Clear display buffer at start and at switching inputs.
+- Clear data buffer at start and at switching inputs.
 - Multiline button caption.
 
 ### Version 3.1
-- stop response improved for fast mode.
-- value computation for ultra fast modes fixed.
+- Stop response improved for fast mode.
+- Value computation for ultra fast modes fixed.
 - millis() timer compensation formula fixed.
 - AC/DC button and info line handling improved.
 
