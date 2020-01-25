@@ -28,9 +28,9 @@
 /****************************************************************************
  * Change this if you have reprogrammed the hc05 module for other baud rate
  ***************************************************************************/
-#ifndef HC_05_BAUD_RATE
-//#define HC_05_BAUD_RATE BAUD_115200
-#define HC_05_BAUD_RATE BAUD_9600
+#ifndef BLUETOOTH_BAUD_RATE
+//#define BLUETOOTH_BAUD_RATE BAUD_115200
+#define BLUETOOTH_BAUD_RATE BAUD_9600
 #endif
 
 #define MILLIS_BETWEEN_INFO_OUTPUT 1000
@@ -76,36 +76,7 @@ const unsigned int REMOTE_DISPLAY_WIDTH = 320;
 #define ATTENUATOR_1_PIN 5 // PD5
 #define AC_DC_RELAY_PIN 6 // PD6
 
-/*
- * COLORS
- */
-#define COLOR_BACKGROUND_DSO COLOR_WHITE
-
-// Data colors
-#define COLOR_DATA_RUN COLOR_BLUE
-#define COLOR_DATA_HOLD COLOR_RED
-// to see old chart values
-#define COLOR_DATA_HISTORY RGB(0x20,0xFF,0x20)
-
-// Line colors
-#define COLOR_VOLTAGE_PICKER COLOR_YELLOW
-#define COLOR_VOLTAGE_PICKER_SLIDER RGB(0xFF,0XFF,0xD0) // Light Yellow
-#define COLOR_TRIGGER_LINE COLOR_PURPLE
-#define COLOR_TRIGGER_SLIDER RGB(0xFF,0XE8,0xFF) // light Magenta
-#define COLOR_HOR_REF_LINE_LABEL COLOR_BLUE
-#define COLOR_MAX_MIN_LINE COLOR_GREEN
-#define COLOR_GRID_LINES RGB(0x00,0x98,0x00)
-
-// Label colors
-#define COLOR_HOR_GRID_LINE_LABEL COLOR_BLUE
-#define COLOR_HOR_GRID_LINE_LABEL_NEGATIVE COLOR_RED
-
 // GUI element colors
-#define COLOR_GUI_CONTROL RGB(0xE8,0x00,0x00)
-#define COLOR_GUI_TRIGGER RGB(0x00,0x00,0xFF) // blue
-#define COLOR_GUI_SOURCE_TIMEBASE RGB(0x00,0xE0,0x00)
-
-#define COLOR_INFO_BACKGROUND RGB(0xC8,0xC8,0x00)
 
 #define COLOR_SLIDER RGB(0xD0,0xD0,0xD0)
 
@@ -149,7 +120,7 @@ struct MeasurementControlStruct {
     // AC / DC Switch
     bool ChannelHasAC_DCSwitch; // has AC / DC switch - only for channels with active or passive attenuators. Is at least false for TEMP and REF channels
     bool ChannelIsACMode;   // AC Mode for actual channel
-    bool isACMode;          // storage for user AC mode setting used to restore AC mode when switching back from channel without AC capabilities.
+    bool isACMode; // storage for user AC mode setting used to restore AC mode when switching back from channel without AC capabilities.
     uint16_t RawDSOReadingACZero;
 
     // Trigger
