@@ -71,7 +71,7 @@ constexpr int ButtonWidth ( int aNumberOfButtonsPerLine, int aDisplayWidth ) {re
 //
 // for 3 buttons horizontal - dynamic
 #define BUTTON_WIDTH_3_DYN (sActualDisplayWidth/3 - BUTTON_HORIZONTAL_SPACING_DYN)
-#define BUTTON_WIDTH_3_DYN_POS_2 (sActualDisplayWidth/3)
+#define BUTTON_WIDTH_3_DYN_POS_2 (sActualDisplayWidth/3 + (BUTTON_HORIZONTAL_SPACING_DYN / 2))
 #define BUTTON_WIDTH_3_DYN_POS_3 (sActualDisplayWidth - BUTTON_WIDTH_3_DYN)
 
 // width 3.5

@@ -77,7 +77,7 @@ void initSerial(uint32_t aBaudRate) {
 #ifdef USE_SIMPLE_SERIAL
     initSimpleSerial(aBaudRate);
 #else
-    Serial.begin(BLUETOOTH_BAUD_RATE);
+    Serial.begin(aBaudRate);
 #endif
 }
 

@@ -49,6 +49,8 @@
 
 #include <stdlib.h> // for abs()
 
+unsigned long sMillisOfLastReceivedBDEvent;
+
 #ifndef DO_NOT_NEED_BASIC_TOUCH_EVENTS
 struct TouchEvent sDownPosition;
 struct TouchEvent sActualPosition;
@@ -298,12 +300,8 @@ void checkAndHandleEvents(void) {
     // get Arduino Serial data first
     serialEvent();
 #endif
-    if (remoteTouchDownEvent.EventType != EVENT_NO_EVENT) {
         handleEvent(&remoteTouchDownEvent);
-    }
-    if (remoteEvent.EventType != EVENT_NO_EVENT) {
         handleEvent(&remoteEvent);
-    }
 #else
     /*
      * check USART buffer, which in turn calls handleEvent() if event was received
@@ -314,9 +312,14 @@ void checkAndHandleEvents(void) {
 
 /**
  * Interprets the event type and manage the callbacks and flags
- * is indirectly called by thread in main loop
+ * It is indirectly called by thread in main loop
  */
 extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
+    // First check if we really have an event here
+    if(aEvent->EventType == EVENT_NO_EVENT ){
+        return;
+    }
+
     uint8_t tEventType = aEvent->EventType;
 
     // local copy of event since the values in the original event may be overwritten if the handler needs long time for its action
@@ -506,7 +509,7 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
         case EVENT_CONNECTION_BUILD_UP:
 //    } else if (tEventType == EVENT_CONNECTION_BUILD_UP) {
         /*
-         * Got max display size for actual orientation and timestamp
+         * Got max display size for current orientation and timestamp
          */
         BlueDisplay1.mMaxDisplaySize.XWidth = tEvent.EventData.DisplaySizeAndTimestamp.DisplaySize.XWidth;
         BlueDisplay1.mMaxDisplaySize.YHeight = tEvent.EventData.DisplaySizeAndTimestamp.DisplaySize.YHeight;
@@ -556,6 +559,7 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
             sRedrawCallback();
         }
     }
+    sMillisOfLastReceivedBDEvent = millis(); // set time of (last) event
 }
 
 #ifdef LOCAL_DISPLAY_EXISTS

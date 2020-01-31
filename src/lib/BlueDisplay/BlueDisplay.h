@@ -72,8 +72,12 @@
 #include "BDSlider.h" // for BDSliderHandle_t
 #endif
 
-#define VERSION_BLUE_DISPLAY "1.2.0"
+#define VERSION_BLUE_DISPLAY "1.2.1"
+#define VERSION_BLUE_DISPLAY_NUMERICAL 121
 /*
+ * Version 1.2.1
+ * - Added `sMillisOfLastReceivedBDEvent` for user timeout detection.
+ *
  * Version 1.2.0
  * - Use type `Print *` instead of `Stream *`.
  * - New function `initSerial()`
@@ -82,7 +86,7 @@
  * This old version numbers corresponds to the version of the BlueDisplay app
  * Version 3.7
  * - Handling of no input for getNumber.
- * - Slider setScaleFactor() does not scale the actual value, mostly delivered as initial value at init().
+ * - Slider setScaleFactor() does not scale the current value, mostly delivered as initial value at init().
  * Version 3.6 connect, reconnect and autoconnect improved/added. Improved debug() command. Simplified Red/Green button handling.
  * Version 3.5 Slider scaling changed and unit value added.
  * Version 3.4
