@@ -31,11 +31,16 @@
 #define BLUEDISPLAY_INCLUDE_BDSLIDER_H_
 
 #include <stdint.h>
-
+/*
+ * For more slider constants see BlueDisplay.h
+ */
 #define SLIDER_DEFAULT_BORDER_COLOR     COLOR_BLUE
 #define SLIDER_DEFAULT_BAR_COLOR        COLOR_GREEN
 #define SLIDER_DEFAULT_BACKGROUND_COLOR COLOR_WHITE
 #define SLIDER_DEFAULT_THRESHOLD_COLOR  COLOR_RED
+
+#define SLIDER_DEFAULT_CAPTION_COLOR    COLOR_BLACK
+#define SLIDER_DEFAULT_CAPTION_BACKGROUND_COLOR    COLOR_WHITE
 
 #ifdef LOCAL_DISPLAY_EXISTS
 #include "TouchSlider.h"
@@ -86,8 +91,10 @@ public:
 
     void drawSlider(void);
     void drawBorder(void);
-    void setActualValue(int16_t aActualValue);
-    void setActualValueAndDrawBar(int16_t aActualValue);
+    void setValue(int16_t aCurrentValue);
+    void setValueAndDrawBar(int16_t aCurrentValue);
+    void setActualValue(int16_t aCurrentValue);// deprecated
+    void setActualValueAndDrawBar(int16_t aCurrentValue); // deprecated
     void setBarColor(color16_t aBarColor);
     void setBarThresholdColor(color16_t aBarThresholdColor);
     void setBarBackgroundColor(color16_t aBarBackgroundColor);
@@ -115,7 +122,7 @@ public:
     int printValue();
     void setXOffsetValue(int16_t aXOffsetValue);
 
-    int16_t getActualValue(void) const;
+    int16_t getCurrentValue(void) const;
     uint16_t getPositionXRight(void) const;
     uint16_t getPositionYBottom(void) const;
     void deinit(void);

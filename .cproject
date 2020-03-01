@@ -79,8 +79,6 @@
 							<tool id="de.innot.avreclipse.tool.avrdude.app.debug.1182111075" name="AVRDude" superClass="de.innot.avreclipse.tool.avrdude.app.debug"/>
 						</toolChain>
 					</folderInfo>
-					<fileInfo id="de.innot.avreclipse.configuration.app.debug.961549999.1669332948" name="TouchDSOCommon.h" rcbsApplicability="disable" resourcePath="src/TouchDSOCommon.h" toolsToInvoke=""/>
-					<fileInfo id="de.innot.avreclipse.configuration.app.debug.961549999.1871109592" name="BlueDisplay.h" rcbsApplicability="disable" resourcePath="src/lib/BlueDisplay/BlueDisplay.h" toolsToInvoke=""/>
 					<sourceEntries>
 						<entry excluding="README.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
@@ -165,8 +163,6 @@
 							<tool id="de.innot.avreclipse.tool.avrdude.app.debug.455404404" name="AVRDude" superClass="de.innot.avreclipse.tool.avrdude.app.debug"/>
 						</toolChain>
 					</folderInfo>
-					<fileInfo id="de.innot.avreclipse.configuration.app.debug.961549999.2003113689.src/TouchDSOCommon.h" name="TouchDSOCommon.h" rcbsApplicability="disable" resourcePath="src/TouchDSOCommon.h" toolsToInvoke=""/>
-					<fileInfo id="de.innot.avreclipse.configuration.app.debug.961549999.2003113689.src/lib/BlueDisplay/BlueDisplay.h" name="BlueDisplay.h" rcbsApplicability="disable" resourcePath="src/lib/BlueDisplay/BlueDisplay.h" toolsToInvoke=""/>
 					<sourceEntries>
 						<entry excluding="README.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
@@ -252,8 +248,6 @@
 							<tool id="de.innot.avreclipse.tool.avrdude.app.debug.53461869" name="AVRDude" superClass="de.innot.avreclipse.tool.avrdude.app.debug"/>
 						</toolChain>
 					</folderInfo>
-					<fileInfo id="de.innot.avreclipse.configuration.app.debug.961549999.627252364.src/TouchDSOCommon.h" name="TouchDSOCommon.h" rcbsApplicability="disable" resourcePath="src/TouchDSOCommon.h" toolsToInvoke=""/>
-					<fileInfo id="de.innot.avreclipse.configuration.app.debug.961549999.627252364.src/lib/BlueDisplay/BlueDisplay.h" name="BlueDisplay.h" rcbsApplicability="disable" resourcePath="src/lib/BlueDisplay/BlueDisplay.h" toolsToInvoke=""/>
 					<sourceEntries>
 						<entry excluding="README.c|arduino" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
