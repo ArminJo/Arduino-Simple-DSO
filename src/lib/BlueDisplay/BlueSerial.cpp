@@ -9,7 +9,7 @@
  *  It also implements basic GUI elements as buttons and sliders.
  *  GUI callback, touch and sensor events are sent back to Arduino.
  *
- *  Copyright (C) 2014  Armin Joachimsmeyer
+ *  Copyright (C) 2014-2020  Armin Joachimsmeyer
  *  armin.joachimsmeyer@gmail.com
  *
  *  This file is part of BlueDisplay https://github.com/ArminJo/android-blue-display.
@@ -50,19 +50,19 @@
 bool usePairedPin = false;
 
 void setUsePairedPin(bool aUsePairedPin) {
-	usePairedPin = aUsePairedPin;
+    usePairedPin = aUsePairedPin;
 }
 
 bool USART_isBluetoothPaired(void) {
-	if (!usePairedPin) {
-		return true;
-	}
-	// use tVal to produce optimal code with the compiler
-	uint8_t tVal = digitalReadFast(PAIRED_PIN);
-	if (tVal != 0) {
-		return true;
-	}
-	return false;
+    if (!usePairedPin) {
+        return true;
+    }
+    // use tVal to produce optimal code with the compiler
+    uint8_t tVal = digitalReadFast(PAIRED_PIN);
+    if (tVal != 0) {
+        return true;
+    }
+    return false;
 }
 #endif // defined(LOCAL_DISPLAY_EXISTS) && defined(REMOTE_DISPLAY_SUPPORTED)
 
@@ -70,23 +70,35 @@ bool USART_isBluetoothPaired(void) {
 #define Serial Serial1
 #endif
 
+#if defined(ESP32)
+#include "BluetoothSerial.h"
+BluetoothSerial SerialBT;
+#define Serial SerialBT
+#endif
+
 /*
  * Wrapper for calling initSimpleSerial or Serial[0,1].begin
  */
-void initSerial(uint32_t aBaudRate) {
-#ifdef USE_SIMPLE_SERIAL
-    initSimpleSerial(aBaudRate);
-#else
-    Serial.begin(aBaudRate);
-#endif
+#if defined(ESP32)
+void initSerial(String aBTClientName) {
+    Serial.begin(aBTClientName, false);
 }
+#else
+void initSerial(uint32_t aBaudRate) {
+#  ifdef USE_SIMPLE_SERIAL
+    initSimpleSerial(aBaudRate);
+#  else
+    Serial.begin(aBaudRate);
+#  endif
+}
+#endif
 
 #ifdef USE_SIMPLE_SERIAL
 #  ifdef LOCAL_DISPLAY_EXISTS
 void initSimpleSerial(uint32_t aBaudRate, bool aUsePairedPin) {
-	if (aUsePairedPin) {
-		pinMode(PAIRED_PIN, INPUT);
-	}
+    if (aUsePairedPin) {
+        pinMode(PAIRED_PIN, INPUT);
+    }
 #  else
 void initSimpleSerial(uint32_t aBaudRate) {
 #  endif // LOCAL_DISPLAY_EXISTS
@@ -112,7 +124,7 @@ void initSimpleSerial(uint32_t aBaudRate) {
     // 8,68 (- 1) for 230400 8,5% for 8, 3.7% for 9
     // 4,34 (- 1) for 460800 8,5%
     // HC-05 Specified Max Total Error (%) for 8 bit= +3.90/-4.00
-    baud_setting = (((F_CPU / 4) / aBaudRate) - 1) / 2;		// /2 after -1 because of better rounding
+    baud_setting = (((F_CPU / 4) / aBaudRate) - 1) / 2;        // /2 after -1 because of better rounding
 
     // assign the baud_setting, a.k.a. ubbr (USART Baud Rate Register)
     UBRR0H = baud_setting >> 8;
@@ -172,11 +184,17 @@ uint8_t sReceiveBufferIndex = 0; // Index of first free position in buffer
 bool sReceiveBufferOutOfSync = false;
 
 /**
- * very simple blocking USART send routine - works 100%!
+ * The central point for sending bytes
  */
 void sendUSARTBufferNoSizeCheck(uint8_t * aParameterBufferPointer, int aParameterBufferLength, uint8_t * aDataBufferPointer,
         int16_t aDataBufferLength) {
-#ifdef USE_SIMPLE_SERIAL
+#if ! defined(USE_SIMPLE_SERIAL)
+    Serial.write(aParameterBufferPointer, aParameterBufferLength);
+    Serial.write(aDataBufferPointer, aDataBufferLength);
+#else
+/*
+ * Simple and reliable blocking version for Atmega328
+ */
     while (aParameterBufferLength > 0) {
         // wait for USART send buffer to become empty
 #  if (defined(UCSR1A) && ! defined(USE_USB_SERIAL)) || ! defined (UCSR0A) // Use TX1 on MEGA and on Leonardo, which has no TX0
@@ -211,9 +229,6 @@ void sendUSARTBufferNoSizeCheck(uint8_t * aParameterBufferPointer, int aParamete
         aDataBufferPointer++;
         aDataBufferLength--;
     }
-#else // USE_SIMPLE_SERIAL
-	Serial.write(aParameterBufferPointer, aParameterBufferLength);
-	Serial.write(aDataBufferPointer, aDataBufferLength);
 #endif // USE_SIMPLE_SERIAL
 }
 
@@ -379,56 +394,56 @@ ISR(USART1_RX_vect) {
  * Will be called after each loop() (by Arduino Serial...) to process input data if available.
  */
 void serialEvent(void) {
-	if (sReceiveBufferOutOfSync) {
+    if (sReceiveBufferOutOfSync) {
 // just wait for next sync token
-		while (Serial.available() > 0) {
-			if (Serial.read() == SYNC_TOKEN) {
-				sReceiveBufferOutOfSync = false;
-				sReceivedEventType = EVENT_NO_EVENT;
-				break;
-			}
-		}
-	}
-	if (!sReceiveBufferOutOfSync) {
-		/*
-		 * regular operation here
-		 */
-		uint8_t tBytesAvailable = Serial.available();
-		/*
-		 * enough bytes available for next step?
-		 */
-		if (sReceivedEventType == EVENT_NO_EVENT) {
-			if (tBytesAvailable >= 2) {
-				/*
-				 * read message length and event tag first
-				 */
-				Serial.readBytes((char *) sReceiveBuffer, 2);
-				// First byte is raw length so subtract 3 for sync+eventType+length bytes
-				sReceivedDataSize = sReceiveBuffer[0] - 3;
-				if (sReceivedDataSize > RECEIVE_MAX_DATA_SIZE) {
-					// invalid length
-					sReceiveBufferOutOfSync = true;
-					return;
-				}
-				sReceivedEventType = sReceiveBuffer[1];
-				tBytesAvailable -= 2;
-			}
-		}
-		if (sReceivedEventType != EVENT_NO_EVENT) {
-			if (tBytesAvailable > sReceivedDataSize) {
-				// touch or size event complete received, now read data and sync token
-				Serial.readBytes((char *) sReceiveBuffer, sReceivedDataSize);
-				if (Serial.read() == SYNC_TOKEN) {
-					remoteEvent.EventType = sReceivedEventType;
-					// copy buffer to structure
-					memcpy(remoteEvent.EventData.ByteArray, sReceiveBuffer, sReceivedDataSize);
-					sReceivedEventType = EVENT_NO_EVENT;
-					handleEvent(&remoteEvent);
-				} else {
-					sReceiveBufferOutOfSync = true;
-				}
-			}
-		}
-	}
+        while (Serial.available() > 0) {
+            if (Serial.read() == SYNC_TOKEN) {
+                sReceiveBufferOutOfSync = false;
+                sReceivedEventType = EVENT_NO_EVENT;
+                break;
+            }
+        }
+    }
+    if (!sReceiveBufferOutOfSync) {
+        /*
+         * regular operation here
+         */
+        uint8_t tBytesAvailable = Serial.available();
+        /*
+         * enough bytes available for next step?
+         */
+        if (sReceivedEventType == EVENT_NO_EVENT) {
+            if (tBytesAvailable >= 2) {
+                /*
+                 * read message length and event tag first
+                 */
+                Serial.readBytes((char *) sReceiveBuffer, 2);
+                // First byte is raw length so subtract 3 for sync+eventType+length bytes
+                sReceivedDataSize = sReceiveBuffer[0] - 3;
+                if (sReceivedDataSize > RECEIVE_MAX_DATA_SIZE) {
+                    // invalid length
+                    sReceiveBufferOutOfSync = true;
+                    return;
+                }
+                sReceivedEventType = sReceiveBuffer[1];
+                tBytesAvailable -= 2;
+            }
+        }
+        if (sReceivedEventType != EVENT_NO_EVENT) {
+            if (tBytesAvailable > sReceivedDataSize) {
+                // Event complete received, now read data and sync token
+                Serial.readBytes((char *) sReceiveBuffer, sReceivedDataSize);
+                if (Serial.read() == SYNC_TOKEN) {
+                    remoteEvent.EventType = sReceivedEventType;
+                    // copy buffer to structure
+                    memcpy(remoteEvent.EventData.ByteArray, sReceiveBuffer, sReceivedDataSize);
+                    sReceivedEventType = EVENT_NO_EVENT;
+                    handleEvent(&remoteEvent);
+                } else {
+                    sReceiveBufferOutOfSync = true;
+                }
+            }
+        }
+    }
 }
 #endif // USE_SIMPLE_SERIAL

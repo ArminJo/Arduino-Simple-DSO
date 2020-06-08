@@ -15,10 +15,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@master
-                                         
+
       - name: Compile all examples
         uses: ArminJo/arduino-test-compile@master
         with:
-          sketch-name: SimpleTouchScreenDSO.cpp
-          libraries: BlueDisplay
+          sketch-names: SimpleTouchScreenDSO.cpp
+          required-libraries: BlueDisplay
 

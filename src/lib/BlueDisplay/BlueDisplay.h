@@ -7,7 +7,7 @@
  *  It also implements basic GUI elements as buttons and sliders.
  *  GUI callback, touch and sensor events are sent back to Arduino.
  *
- *  Copyright (C) 2014  Armin Joachimsmeyer
+ *  Copyright (C) 2014-2020  Armin Joachimsmeyer
  *  armin.joachimsmeyer@gmail.com
  *
  *  This file is part of BlueDisplay https://github.com/ArminJo/android-blue-display.
@@ -31,8 +31,10 @@
 #define BLUEDISPLAY_H_
 
 #ifdef ARDUINO
+#  if ! defined(ESP32)
 // For not AVR platforms this contains mapping defines (at least for STM32)
 #include <avr/pgmspace.h>
+#  endif
 #  if defined(strcpy_P) // check if we have mapping defines
 #    if ! defined(strncpy_P)
 // this define is not included in the pgmspace.h file :-(
@@ -72,9 +74,16 @@
 #include "BDSlider.h" // for BDSliderHandle_t
 #endif
 
-#define VERSION_BLUE_DISPLAY "1.3.0"
-#define VERSION_BLUE_DISPLAY_NUMERICAL 130
+#define VERSION_BLUE_DISPLAY "2.0.0"
+#define VERSION_BLUE_DISPLAY_MAJOR 2
+#define VERSION_BLUE_DISPLAY_MINOR 0
 /*
+ * Version 2.1.0
+ * - Improved initCommunication and late connection handling.
+ *
+ * Version 2.0.0
+ * - ESP32 and ESP8266 support added. External BT module needed for ESP8266.
+ *
  * Version 1.3.0
  * - Added `sMillisOfLastReceivedBDEvent` for user timeout detection.
  * - Fixed bug in `debug(const char* aMessage, float aFloat)`.
@@ -346,6 +355,7 @@ public:
     void setLongTouchDownTimeout(uint16_t aLongTouchDownTimeoutMillis);
 
     void clearDisplay(color16_t aColor = COLOR_WHITE);
+    void clearDisplayOptional(color16_t aColor = COLOR_WHITE);
     void drawDisplayDirect(void);
     void setScreenOrientationLock(uint8_t aLockMode);
 
@@ -385,8 +395,8 @@ public:
     void debug(int8_t aByte);
     void debug(uint16_t aShort);
     void debug(const char* aMessage, uint16_t aShort);
-    void debug(int aShort);
-    void debug(const char* aMessage, int aShort);
+    void debug(int16_t aShort);
+    void debug(const char* aMessage, int16_t aShort);
     void debug(uint32_t aLong);
     void debug(const char* aMessage, uint32_t aLong);
     void debug(int32_t aLong);
@@ -441,7 +451,7 @@ public:
     void setSensor(uint8_t aSensorType, bool aDoActivate, uint8_t aSensorRate, uint8_t aFilterFlag);
 
 #ifdef LOCAL_DISPLAY_EXISTS
-	void drawMLText(uint16_t aPosX, uint16_t aPosY, const char *aStringPtr, uint16_t aTextSize, color16_t aFGColor, color16_t aBGColor);
+    void drawMLText(uint16_t aPosX, uint16_t aPosY, const char *aStringPtr, uint16_t aTextSize, color16_t aFGColor, color16_t aBGColor);
 #endif
 
 #ifdef AVR
@@ -570,7 +580,7 @@ void writeStringC(const char *aStringPtr, uint8_t aStringLength);
  */
 #ifdef AVR
 uint16_t readADCChannelWithReferenceOversample(uint8_t aChannelNumber, uint8_t aReference, uint8_t aOversampleExponent);
-float getVCCValue(void);
+float getVCCValue(void) __attribute__ ((deprecated ("Renamed to getVCCVoltage()")));
 float getVCCVoltage(void);
 float getTemperature(void);
 #endif

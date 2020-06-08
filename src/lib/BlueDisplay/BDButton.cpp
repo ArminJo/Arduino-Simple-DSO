@@ -91,7 +91,7 @@ void BDButton::init(uint16_t aPositionX, uint16_t aPositionY, uint16_t aWidthX, 
 
     BDButtonHandle_t tButtonNumber = sLocalButtonIndex++;
     if (USART_isBluetoothPaired()) {
-#ifndef AVR
+#if __SIZEOF_POINTER__ == 4
         sendUSARTArgsAndByteBuffer(FUNCTION_BUTTON_CREATE, 11, tButtonNumber, aPositionX, aPositionY, aWidthX, aHeightY,
                 aButtonColor, aCaptionSize, aFlags, aValue, aOnTouchHandler, (reinterpret_cast<uint32_t>(aOnTouchHandler) >> 16),
                 strlen(aCaption), aCaption);
@@ -357,8 +357,15 @@ void BDButton::init(uint16_t aPositionX, uint16_t aPositionY, uint16_t aWidthX, 
         }
         char tStringBuffer[STRING_BUFFER_STACK_SIZE];
         strncpy_P(tStringBuffer, tPGMCaption, tCaptionLength);
+
+#if __SIZEOF_POINTER__ == 4
+        sendUSARTArgsAndByteBuffer(FUNCTION_BUTTON_CREATE, 11, tButtonNumber, aPositionX, aPositionY, aWidthX, aHeightY,
+                aButtonColor, aCaptionSize, aFlags, aValue, aOnTouchHandler, (reinterpret_cast<uint32_t>(aOnTouchHandler) >> 16),
+                tCaptionLength, tStringBuffer);
+#else
         sendUSARTArgsAndByteBuffer(FUNCTION_BUTTON_CREATE, 10, tButtonNumber, aPositionX, aPositionY, aWidthX, aHeightY,
                 aButtonColor, aCaptionSize, aFlags, aValue, aOnTouchHandler, tCaptionLength, tStringBuffer);
+#endif
     }
     mButtonHandle = tButtonNumber;
 }

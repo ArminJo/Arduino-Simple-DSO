@@ -9,7 +9,7 @@
  *  It also implements basic GUI elements as buttons and sliders.
  *  GUI callback, touch and sensor events are sent back to Arduino.
  *
- *  Copyright (C) 2014  Armin Joachimsmeyer
+ *  Copyright (C) 2014-2020  Armin Joachimsmeyer
  *  armin.joachimsmeyer@gmail.com
  *
  *  This file is part of BlueDisplay https://github.com/ArminJo/android-blue-display.
@@ -62,15 +62,15 @@ struct TouchEvent sUpPosition;
  * helper variables
  */
 //
-bool sNothingTouched = false; // = !(sSliderTouched || sAutorepeatButtonTouched)
-bool sSliderIsMoveTarget = false; // true if slider was touched by DOWN event
+bool sNothingTouched = false;// = !(sSliderTouched || sAutorepeatButtonTouched)
+bool sSliderIsMoveTarget = false;// true if slider was touched by DOWN event
 
 uint32_t sLongTouchDownTimeoutMillis;
 /*
  * timer related callbacks
  */
 //
-bool (*sPeriodicTouchCallback)(int, int) = NULL; // return parameter not yet used
+bool (*sPeriodicTouchCallback)(int, int) = NULL;// return parameter not yet used
 uint32_t sPeriodicCallbackPeriodMillis;
 
 struct BluetoothEvent localTouchEvent;
@@ -81,7 +81,7 @@ bool sDisableTouchUpOnce = false;
 bool sDisableUntilTouchUpIsDone = false;
 
 struct BluetoothEvent remoteEvent;
-#ifdef ARDUINO
+#ifdef USE_SIMPLE_SERIAL
 // Serves also as second buffer for regular events to avoid overwriting of touch down events if CPU is busy and interrupt in not enabled
 struct BluetoothEvent remoteTouchDownEvent;
 #endif
@@ -207,15 +207,15 @@ void delayMillisWithCheckAndHandleEvents(unsigned long aTimeMillis) {
 #ifdef ARDUINO
     unsigned long tStartMillis = millis();
     while (millis() - tStartMillis < aTimeMillis) {
-#  if !defined(USE_SIMPLE_SERIAL) && defined (AVR)
+#  if !defined(USE_SIMPLE_SERIAL) && defined (__AVR__)
         // check for Arduino serial - code from arduino main.cpp / main()
         if (serialEventRun) {
             serialEventRun();
         }
 #  endif
 #else // ARDUINO
-    unsigned long tStartMillis = getMillisSinceBoot();
-    while (getMillisSinceBoot() - tStartMillis < aTimeMillis) {
+        unsigned long tStartMillis = getMillisSinceBoot();
+        while (getMillisSinceBoot() - tStartMillis < aTimeMillis) {
 #endif
         checkAndHandleEvents();
 #if defined(ESP8266)
@@ -301,8 +301,9 @@ void checkAndHandleEvents(void) {
 #ifndef USE_SIMPLE_SERIAL
     // get Arduino Serial data first
     serialEvent();
-#endif
+#else
     handleEvent(&remoteTouchDownEvent);
+#endif
     handleEvent(&remoteEvent);
 #else
     /*
@@ -321,7 +322,10 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
     if (aEvent->EventType == EVENT_NO_EVENT) {
         return;
     }
-
+#if defined(ESP32) && defined DEBUG
+        Serial.print("EventType=0x");
+        Serial.println(aEvent->EventType, HEX);
+#endif
     uint8_t tEventType = aEvent->EventType;
 
     // local copy of event since the values in the original event may be overwritten if the handler needs long time for its action
@@ -343,7 +347,7 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
     void (*tSliderCallback)(BDSliderHandle_t *, int16_t);
     void (*tButtonCallback)(BDButtonHandle_t *, int16_t);
 
-    switch (tEventType) { // switch needs 36 bytes more code :-(
+    switch (tEventType) { // switch needs 36 bytes more code but is clearer to understand :-(
 
 #ifndef DO_NOT_NEED_BASIC_TOUCH_EVENTS
     case EVENT_TOUCH_ACTION_DOWN:
@@ -414,12 +418,12 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
 //    if (tEventType == EVENT_BUTTON_CALLBACK) {
         sTouchIsStillDown = false; // to disable local touch up detection
 #ifdef LOCAL_DISPLAY_EXISTS
-        tButtonCallback = (void (*)(BDButtonHandle_t*, int16_t)) tEvent.EventData.GuiCallbackInfo.Handler;; // 2 ;; for pretty print :-(
-        {
-            BDButton tTempButton = BDButton(tEvent.EventData.GuiCallbackInfo.ObjectIndex,
-                    TouchButton::getLocalButtonFromBDButtonHandle(tEvent.EventData.GuiCallbackInfo.ObjectIndex));
-            tButtonCallback(&tTempButton.mButtonHandle, tEvent.EventData.GuiCallbackInfo.ValueForGuiHandler.uint16Values[0]);
-        }
+                tButtonCallback = (void (*)(BDButtonHandle_t*, int16_t)) tEvent.EventData.GuiCallbackInfo.Handler;; // 2 ;; for pretty print :-(
+                {
+                    BDButton tTempButton = BDButton(tEvent.EventData.GuiCallbackInfo.ObjectIndex,
+                            TouchButton::getLocalButtonFromBDButtonHandle(tEvent.EventData.GuiCallbackInfo.ObjectIndex));
+                    tButtonCallback(&tTempButton.mButtonHandle, tEvent.EventData.GuiCallbackInfo.ValueForGuiHandler.uint16Values[0]);
+                }
 #else
         //BDButton * is the same as BDButtonHandle_t * since BDButton only has one BDButtonHandle_t element
         tButtonCallback = (void (*)(BDButtonHandle_t*, int16_t)) tEvent.EventData.GuiCallbackInfo.Handler;; // 2 ;; for pretty print :-(
@@ -443,14 +447,19 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
             }
         }
 #else
-        tSliderCallback = (void (*)(BDSliderHandle_t *, int16_t))tEvent.EventData.GuiCallbackInfo.Handler;; // 2 ;; for pretty print :-(
+        tSliderCallback = (void (*)(BDSliderHandle_t *, int16_t))tEvent.EventData.GuiCallbackInfo.Handler;
         tSliderCallback ((BDSliderHandle_t*) &tEvent.EventData.GuiCallbackInfo.ObjectIndex, tEvent.EventData.GuiCallbackInfo.ValueForGuiHandler.uint16Values[0]);
 #endif
         break;
 
         case EVENT_NUMBER_CALLBACK:
 //    } else if (tEventType == EVENT_NUMBER_CALLBACK) {
-        tNumberCallback = (void (*)(float))tEvent.EventData.GuiCallbackInfo.Handler;tNumberCallback(tEvent.EventData.GuiCallbackInfo.ValueForGuiHandler.floatValue);
+        tNumberCallback = (void (*)(float))tEvent.EventData.GuiCallbackInfo.Handler;
+#if defined(ESP32) && defined DEBUG
+        Serial.print("tNumberCallback=0x");
+        Serial.println((uint32_t)tNumberCallback, HEX);
+#endif
+        tNumberCallback(tEvent.EventData.GuiCallbackInfo.ValueForGuiHandler.floatValue);
         break;
 
         case EVENT_SWIPE_CALLBACK:
@@ -497,7 +506,16 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
         BlueDisplay1.mMaxDisplaySize.XWidth = tEvent.EventData.DisplaySize.XWidth;
         BlueDisplay1.mMaxDisplaySize.YHeight = tEvent.EventData.DisplaySize.YHeight;
         BlueDisplay1.mHostUnixTimestamp = tEvent.EventData.DisplaySizeAndTimestamp.UnixTimestamp;
-        BlueDisplay1.mConnectionEstablished = true;
+
+        if (! BlueDisplay1.mConnectionEstablished) {
+            // if this is the first event, which sets mConnectionEstablished to true, call connection callback anyway
+            BlueDisplay1.mConnectionEstablished = true;
+            if (sConnectCallback != NULL) {
+                sConnectCallback();
+            }
+            // Since with simpleSerial we have only buffer for 1 event, we must also call redraw here
+            tEventType = EVENT_REDRAW;
+        }
 
         if (tEventType == EVENT_REORIENTATION) {
             if (sReorientationCallback != NULL) {
@@ -506,13 +524,19 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
             // Since with simpleSerial we have only buffer for 1 event, we must also call redraw here
             tEventType = EVENT_REDRAW;
         }
+
         break;
 
         case EVENT_CONNECTION_BUILD_UP:
 //    } else if (tEventType == EVENT_CONNECTION_BUILD_UP) {
         /*
-         * Got max display size for current orientation and timestamp
+         * Got max display size for new orientation and local timestamp
          */
+        if (tEvent.EventData.DisplaySize.XWidth > tEvent.EventData.DisplaySize.YHeight) {
+            BlueDisplay1.mOrientationIsLandscape = true;
+        } else {
+            BlueDisplay1.mOrientationIsLandscape = false;
+        }
         BlueDisplay1.mMaxDisplaySize.XWidth = tEvent.EventData.DisplaySizeAndTimestamp.DisplaySize.XWidth;
         BlueDisplay1.mMaxDisplaySize.YHeight = tEvent.EventData.DisplaySizeAndTimestamp.DisplaySize.YHeight;
         BlueDisplay1.mHostUnixTimestamp = tEvent.EventData.DisplaySizeAndTimestamp.UnixTimestamp;
@@ -524,14 +548,14 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
         if (sConnectCallback != NULL) {
             sConnectCallback();
         }
+        // Since with simpleSerial we have only buffer for 1 event, we must also call redraw here
+        tEventType = EVENT_REDRAW;
 
 #ifdef LOCAL_DISPLAY_EXISTS
         // do it after sConnectCallback() since the upper tends to send a reset all command
         TouchButton::reinitAllLocalButtonsForRemote();
         TouchSlider::reinitAllLocalSlidersForRemote();
 #endif
-        // Since with simpleSerial we have only buffer for 1 event, we must also call redraw here
-        tEventType = EVENT_REDRAW;
         break;
 
         case EVENT_DISCONNECT:

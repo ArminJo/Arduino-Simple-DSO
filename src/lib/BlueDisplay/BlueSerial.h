@@ -7,7 +7,7 @@
  *  It also implements basic GUI elements as buttons and sliders.
  *  GUI callback, touch and sensor events are sent back to Arduino.
  *
- *  Copyright (C) 2014  Armin Joachimsmeyer
+ *  Copyright (C) 2014-2020  Armin Joachimsmeyer
  *  armin.joachimsmeyer@gmail.com
  *
  *  This file is part of BlueDisplay https://github.com/ArminJo/android-blue-display.
@@ -37,7 +37,7 @@
 #endif
 
 //#define USE_STANDARD_SERIAL // vs. USE_SIMPLE_SERIAL - comment this out to override the default for AVR.
-#if !defined(USE_STANDARD_SERIAL) && defined (AVR)
+#if !defined(USE_STANDARD_SERIAL) && defined (__AVR__)
 // Simple serial is a simple blocking serial version without receive buffer and other overhead.
 // Using it saves up to 1250 byte FLASH and 185 byte RAM since USART is used directly
 // Simple serial on the MEGA2560 uses USART1
@@ -48,10 +48,12 @@
 //#define USE_USB_SERIAL
 
 /*
- * Determine which serial to use. Prefer the use of second USART, except for direct connection to your smartphone / tablet by USB cable.
- * Use standard Serial if USE_USB_SERIAL is requested.
- * Use Serial1 on stm32 if SERIAL_USB and USART1 is existent. If no SERIAL_USB existent, it needs USART2 to have Serial1 available.
- * Use Serial1 on AVR if second USART is existent, as on the ATMega Boards.
+ * Determine which serial to use.
+ * - Prefer the use of second USART, to have the standard Serial available for application (debug) use,
+ *   except for direct connection to your smartphone / tablet by USB cable.
+ * - Use standard Serial if USE_USB_SERIAL is requested.
+ * - Use Serial1 on stm32 if SERIAL_USB and USART1 is existent. If no SERIAL_USB existent, it needs USART2 to have Serial1 available.
+ * - Use Serial1 on AVR if second USART is existent, as on the ATMega Boards.
  */
 #if ! defined(USE_USB_SERIAL) && ((defined(BOARD_HAVE_USART1) && defined(SERIAL_USB)) \
     || (defined(BOARD_HAVE_USART2) && ! defined(SERIAL_USB)) \
@@ -88,7 +90,7 @@ void sendUSARTArgs(uint8_t aFunctionTag, int aNumberOfArgs, ...);
 void sendUSARTArgsAndByteBuffer(uint8_t aFunctionTag, int aNumberOfArgs, ...);
 void sendUSART5Args(uint8_t aFunctionTag, uint16_t aXStart, uint16_t aYStart, uint16_t aXEnd, uint16_t aYEnd, uint16_t aColor);
 void sendUSART5ArgsAndByteBuffer(uint8_t aFunctionTag, uint16_t aXStart, uint16_t aYStart, uint16_t aXEnd, uint16_t aYEnd,
-		uint16_t aColor, uint8_t * aBufferPtr, size_t aBufferLength);
+        uint16_t aColor, uint8_t * aBufferPtr, size_t aBufferLength);
 
 #define PAIRED_PIN 5
 
@@ -99,8 +101,12 @@ bool USART_isBluetoothPaired(void);
 void initSimpleSerial(uint32_t aBaudRate, bool aUsePairedPin);
 #define USART_isBluetoothPaired() (false)
 #else
+#  if defined(ESP32)
+void initSerial(String aBTClientName);
+#  else
 void initSerial(uint32_t aBaudRate);
 void initSimpleSerial(uint32_t aBaudRate);
+# endif
 #define USART_isBluetoothPaired() (true)
 #endif
 #endif
