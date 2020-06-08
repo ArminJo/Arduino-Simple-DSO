@@ -16,9 +16,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@master
 
+      - name: Checkout custom library
+        uses: actions/checkout@v2
+        with:
+          repository: ArminJo/Arduino-BlueDisplay
+          ref: master
+          path: CustomLibrary_BlueDisplay # must contain string "Custom"
+
       - name: Compile all examples
         uses: ArminJo/arduino-test-compile@master
         with:
           sketch-names: SimpleTouchScreenDSO.cpp
-          required-libraries: BlueDisplay
-
+#          required-libraries: BlueDisplay
