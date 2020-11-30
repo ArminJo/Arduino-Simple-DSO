@@ -49,6 +49,7 @@
 
 #include <stdlib.h> // for abs()
 
+bool sBDEventJustReceived = false;
 unsigned long sMillisOfLastReceivedBDEvent;
 
 #ifndef DO_NOT_NEED_BASIC_TOUCH_EVENTS
@@ -100,33 +101,45 @@ void (*sConnectCallback)(void) = NULL;
 void (*sRedrawCallback)(void) = NULL;
 void (*sReorientationCallback)(void) = NULL;
 
-void (*sSensorChangeCallback)(uint8_t aEventType, struct SensorCallback * aSensorCallbackInfo) = NULL;
+void (*sSensorChangeCallback)(uint8_t aEventType, struct SensorCallback *aSensorCallbackInfo) = NULL;
 
-void registerConnectCallback(void (*aConnectCallback)(void)) {
-    sConnectCallback = aConnectCallback;
-}
+void copyDisplaySizeAndTimestamp(struct BluetoothEvent *aEvent);
 
+
+/*
+ * Is also called on Connect and Reorientation events
+ */
 void registerRedrawCallback(void (*aRedrawCallback)(void)) {
     sRedrawCallback = aRedrawCallback;
 }
 
+/*
+ * Connect event also calls redraw event
+ */
+void registerConnectCallback(void (*aConnectCallback)(void)) {
+    sConnectCallback = aConnectCallback;
+}
+
+/*
+ * Reorientation event also calls redraw event
+ */
 void registerReorientationCallback(void (*aReorientationCallback)(void)) {
     sReorientationCallback = aReorientationCallback;
 }
 
 #ifndef DO_NOT_NEED_BASIC_TOUCH_EVENTS
-void registerTouchDownCallback(void (*aTouchDownCallback)(struct TouchEvent * aCurrentPositionPtr)) {
+void registerTouchDownCallback(void (*aTouchDownCallback)(struct TouchEvent *aCurrentPositionPtr)) {
     sTouchDownCallback = aTouchDownCallback;
 }
 
-void registerTouchMoveCallback(void (*aTouchMoveCallback)(struct TouchEvent * aCurrentPositionPtr)) {
+void registerTouchMoveCallback(void (*aTouchMoveCallback)(struct TouchEvent *aCurrentPositionPtr)) {
     sTouchMoveCallback = aTouchMoveCallback;
 }
 
 /**
  * Register a callback routine which is called when touch goes up
  */
-void registerTouchUpCallback(void (*aTouchUpCallback)(struct TouchEvent * aCurrentPositionPtr)) {
+void registerTouchUpCallback(void (*aTouchUpCallback)(struct TouchEvent *aCurrentPositionPtr)) {
     sTouchUpCallback = aTouchUpCallback;
     // disable next end touch since we are already in a touch handler and don't want the end of this touch to be interpreted
     if (sTouchIsStillDown) {
@@ -185,12 +198,17 @@ void setSwipeEndCallbackEnabled(bool aSwipeEndCallbackEnabled) {
 }
 
 /**
- * @param aSensorType see see android.hardware.Sensor
- * @param aSensorRate see android.hardware.SensorManager (0-3) or in milli seconds
+ * Values received from accelerator sensor are in g (m/(s*s))
+ * @param aSensorType see see android.hardware.Sensor. FLAG_SENSOR_TYPE_ACCELEROMETER, FLAG_SENSOR_TYPE_GYROSCOPE (in BlueDisplay.h)
+ * @param aSensorRate see android.hardware.SensorManager (0-3) one of  {@link #FLAG_SENSOR_DELAY_NORMAL} 200 ms, {@link #FLAG_SENSOR_DELAY_UI} 60 ms,
+ *        {@link #FLAG_SENSOR_DELAY_GAME} 20ms, or {@link #FLAG_SENSOR_DELAY_FASTEST}
+ *        If aSensorRate is > FLAG_SENSOR_DELAY_NORMAL (3) the value is interpreted (by BD app) as milliseconds interval (down do 5 ms).
+ * @param aFilterFlag If FLAG_SENSOR_SIMPLE_FILTER, then sensor values are sent via BT only if value changed.
+ * To avoid noise (event value is solely switching between 2 values), values are skipped too if they are equal last or second last value.
  * @param aSensorChangeCallback one callback for all sensors types
  */
 void registerSensorChangeCallback(uint8_t aSensorType, uint8_t aSensorRate, uint8_t aFilterFlag,
-        void (*aSensorChangeCallback)(uint8_t aSensorType, struct SensorCallback * aSensorCallbackInfo)) {
+        void (*aSensorChangeCallback)(uint8_t aSensorType, struct SensorCallback *aSensorCallbackInfo)) {
     bool tSensorEnable = true;
     if (aSensorChangeCallback == NULL) {
         tSensorEnable = false;
@@ -207,10 +225,10 @@ void delayMillisWithCheckAndHandleEvents(unsigned long aTimeMillis) {
 #ifdef ARDUINO
     unsigned long tStartMillis = millis();
     while (millis() - tStartMillis < aTimeMillis) {
-#  if !defined(USE_SIMPLE_SERIAL) && defined (__AVR__)
-        // check for Arduino serial - code from arduino main.cpp / main()
+#  if !defined(USE_SIMPLE_SERIAL) && defined(__AVR__)
+        // check for Arduino serial - copied code from arduino main.cpp / main()
         if (serialEventRun) {
-            serialEventRun();
+            serialEventRun(); // this in turn calls serialEvent from BlueSerial.cpp
         }
 #  endif
 #else // ARDUINO
@@ -317,7 +335,7 @@ void checkAndHandleEvents(void) {
  * Interprets the event type and manage the callbacks and flags
  * It is indirectly called by thread in main loop
  */
-extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
+extern "C" void handleEvent(struct BluetoothEvent *aEvent) {
     // First check if we really have an event here
     if (aEvent->EventType == EVENT_NO_EVENT) {
         return;
@@ -328,8 +346,11 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
 #endif
     uint8_t tEventType = aEvent->EventType;
 
-    // local copy of event since the values in the original event may be overwritten if the handler needs long time for its action
+    // local copy of event since the values in the original event may be overwritten if the handler requires long time for its action
     struct BluetoothEvent tEvent = *aEvent;
+    // assignment has the same code size as:
+//    struct BluetoothEvent tEvent;
+//    memcpy(&tEvent, aEvent, sizeof(BluetoothEvent));
 
     // avoid using event twice
     aEvent->EventType = EVENT_NO_EVENT;
@@ -347,7 +368,7 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
     void (*tSliderCallback)(BDSliderHandle_t *, int16_t);
     void (*tButtonCallback)(BDButtonHandle_t *, int16_t);
 
-    switch (tEventType) { // switch needs 36 bytes more code but is clearer to understand :-(
+    switch (tEventType) { // switch requires 36 bytes more code but is clearer to understand :-(
 
 #ifndef DO_NOT_NEED_BASIC_TOUCH_EVENTS
     case EVENT_TOUCH_ACTION_DOWN:
@@ -425,7 +446,7 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
                     tButtonCallback(&tTempButton.mButtonHandle, tEvent.EventData.GuiCallbackInfo.ValueForGuiHandler.uint16Values[0]);
                 }
 #else
-        //BDButton * is the same as BDButtonHandle_t * since BDButton only has one BDButtonHandle_t element
+        //BDButton * is the same as BDButtonHandle_t * because BDButton only has one BDButtonHandle_t element
         tButtonCallback = (void (*)(BDButtonHandle_t*, int16_t)) tEvent.EventData.GuiCallbackInfo.Handler;; // 2 ;; for pretty print :-(
         tButtonCallback((BDButtonHandle_t*) &tEvent.EventData.GuiCallbackInfo.ObjectIndex,
                 tEvent.EventData.GuiCallbackInfo.ValueForGuiHandler.uint16Values[0]);
@@ -437,13 +458,13 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
         sTouchIsStillDown = false;// to disable local touch up detection
 #ifdef LOCAL_DISPLAY_EXISTS
         tSliderCallback = (void (*)(BDSliderHandle_t *, int16_t))tEvent.EventData.GuiCallbackInfo.Handler; {
-            TouchSlider * tLocalSlider = TouchSlider::getLocalSliderFromBDSliderHandle(tEvent.EventData.GuiCallbackInfo.ObjectIndex);
+            TouchSlider *tLocalSlider = TouchSlider::getLocalSliderFromBDSliderHandle(tEvent.EventData.GuiCallbackInfo.ObjectIndex);
             BDSlider tTempSlider = BDSlider(tEvent.EventData.GuiCallbackInfo.ObjectIndex, tLocalSlider);
             tSliderCallback(&tTempSlider.mSliderHandle, tEvent.EventData.GuiCallbackInfo.ValueForGuiHandler.uint16Values[0]);
 
             // synchronize local slider - remote one is synchronized by local slider itself
             if (aEvent != &localTouchEvent) {
-                tLocalSlider->setCurrentValueAndDrawBar(tEvent.EventData.GuiCallbackInfo.ValueForGuiHandler.uint16Values[0]);
+                tLocalSlider->setValueAndDrawBar(tEvent.EventData.GuiCallbackInfo.ValueForGuiHandler.uint16Values[0]);
             }
         }
 #else
@@ -467,7 +488,7 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
         // reset flags, since swipe is sent at touch up
         sTouchIsStillDown = false;
         if (sSwipeEndCallback != NULL) {
-            // compute it locally - no need to send it over the line
+            // compute it locally - not required to send it over the line
             if (tEvent.EventData.SwipeInfo.SwipeMainDirectionIsX) {
                 tEvent.EventData.SwipeInfo.TouchDeltaAbsMax = abs(tEvent.EventData.SwipeInfo.TouchDeltaX);
             } else {
@@ -496,6 +517,7 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
         case EVENT_REQUESTED_DATA_CANVAS_SIZE:
 //    } else if (tEventType == EVENT_REORIENTATION || tEventType == EVENT_REQUESTED_DATA_CANVAS_SIZE) {
         /*
+         * This is the event returned for initCommunication()
          * Got max display size for new orientation and local timestamp
          */
         if (tEvent.EventData.DisplaySize.XWidth > tEvent.EventData.DisplaySize.YHeight) {
@@ -503,9 +525,7 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
         } else {
             BlueDisplay1.mOrientationIsLandscape = false;
         }
-        BlueDisplay1.mMaxDisplaySize.XWidth = tEvent.EventData.DisplaySize.XWidth;
-        BlueDisplay1.mMaxDisplaySize.YHeight = tEvent.EventData.DisplaySize.YHeight;
-        BlueDisplay1.mHostUnixTimestamp = tEvent.EventData.DisplaySizeAndTimestamp.UnixTimestamp;
+        copyDisplaySizeAndTimestamp(&tEvent); // must be done before call of callback functions
 
         if (! BlueDisplay1.mConnectionEstablished) {
             // if this is the first event, which sets mConnectionEstablished to true, call connection callback anyway
@@ -513,15 +533,15 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
             if (sConnectCallback != NULL) {
                 sConnectCallback();
             }
-            // Since with simpleSerial we have only buffer for 1 event, we must also call redraw here
-            tEventType = EVENT_REDRAW;
+            // Since with simpleSerial we have only buffer for 1 event, only one event is sent and we must also call redraw here
+            tEventType = EVENT_REDRAW;// This sets mCurrentDisplaySize
         }
 
         if (tEventType == EVENT_REORIENTATION) {
             if (sReorientationCallback != NULL) {
                 sReorientationCallback();
             }
-            // Since with simpleSerial we have only buffer for 1 event, we must also call redraw here
+            // Since with simpleSerial we have only buffer for 1 event, only one event is sent and we must also call redraw here
             tEventType = EVENT_REDRAW;
         }
 
@@ -530,6 +550,7 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
         case EVENT_CONNECTION_BUILD_UP:
 //    } else if (tEventType == EVENT_CONNECTION_BUILD_UP) {
         /*
+         * This is the event sent if
          * Got max display size for new orientation and local timestamp
          */
         if (tEvent.EventData.DisplaySize.XWidth > tEvent.EventData.DisplaySize.YHeight) {
@@ -537,9 +558,7 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
         } else {
             BlueDisplay1.mOrientationIsLandscape = false;
         }
-        BlueDisplay1.mMaxDisplaySize.XWidth = tEvent.EventData.DisplaySizeAndTimestamp.DisplaySize.XWidth;
-        BlueDisplay1.mMaxDisplaySize.YHeight = tEvent.EventData.DisplaySizeAndTimestamp.DisplaySize.YHeight;
-        BlueDisplay1.mHostUnixTimestamp = tEvent.EventData.DisplaySizeAndTimestamp.UnixTimestamp;
+        copyDisplaySizeAndTimestamp(&tEvent); // must be done before call of sConnectCallback()
         BlueDisplay1.mConnectionEstablished = true;
 
         // first write a NOP command for synchronizing
@@ -579,13 +598,25 @@ extern "C" void handleEvent(struct BluetoothEvent * aEvent) {
         /*
          * Got current display size since host display size has changed (manually)
          */
-        BlueDisplay1.mCurrentDisplaySize.XWidth = tEvent.EventData.DisplaySize.XWidth;
-        BlueDisplay1.mCurrentDisplaySize.YHeight = tEvent.EventData.DisplaySize.YHeight;
+        copyDisplaySizeAndTimestamp(&tEvent);
         if (sRedrawCallback != NULL) {
             sRedrawCallback();
         }
     }
+    sBDEventJustReceived = true;
+#ifdef ARDUINO
     sMillisOfLastReceivedBDEvent = millis(); // set time of (last) event
+#else
+    sMillisOfLastReceivedBDEvent = getMillisSinceBoot(); // set time of (last) event
+#endif
+}
+
+void copyDisplaySizeAndTimestamp(struct BluetoothEvent *aEvent) {
+    BlueDisplay1.mMaxDisplaySize.XWidth = aEvent->EventData.DisplaySize.XWidth;
+    BlueDisplay1.mCurrentDisplaySize.XWidth = aEvent->EventData.DisplaySize.XWidth;
+    BlueDisplay1.mMaxDisplaySize.YHeight = aEvent->EventData.DisplaySize.YHeight;
+    BlueDisplay1.mCurrentDisplaySize.YHeight = aEvent->EventData.DisplaySize.YHeight;
+    BlueDisplay1.mHostUnixTimestamp = aEvent->EventData.DisplaySizeAndTimestamp.UnixTimestamp;
 }
 
 #ifdef LOCAL_DISPLAY_EXISTS
@@ -604,7 +635,7 @@ void handleLocalTouchUp(void) {
     }
     if (sSliderIsMoveTarget) {
         sSliderIsMoveTarget = false;
-        sDisableTouchUpOnce = true; // Do not call the touch up callback in handleEvent() since slider does not need one
+        sDisableTouchUpOnce = true; // Do not call the touch up callback in handleEvent() since slider does not require one
     } else if (sSwipeEndCallbackEnabled) {
         if (abs(sDownPosition.TouchPosition.PosX - sCurrentPosition.TouchPosition.PosX) >= TOUCH_SWIPE_THRESHOLD
                 || abs(sDownPosition.TouchPosition.PosY - sCurrentPosition.TouchPosition.PosY) >= TOUCH_SWIPE_THRESHOLD) {
@@ -638,7 +669,7 @@ void handleLocalTouchUp(void) {
  * @param aCurrentPositionPtr
  * @return
  */
-void simpleTouchDownHandler(struct TouchEvent * aCurrentPositionPtr) {
+void simpleTouchDownHandler(struct TouchEvent *aCurrentPositionPtr) {
     if (TouchSlider::checkAllSliders(aCurrentPositionPtr->TouchPosition.PosX, aCurrentPositionPtr->TouchPosition.PosY)) {
         sSliderIsMoveTarget = true;
     } else {
@@ -648,13 +679,13 @@ void simpleTouchDownHandler(struct TouchEvent * aCurrentPositionPtr) {
     }
 }
 
-void simpleTouchHandlerOnlyForButtons(struct TouchEvent * aCurrentPositionPtr) {
+void simpleTouchHandlerOnlyForButtons(struct TouchEvent *aCurrentPositionPtr) {
     if (!TouchButton::checkAllButtons(aCurrentPositionPtr->TouchPosition.PosX, aCurrentPositionPtr->TouchPosition.PosY)) {
         sNothingTouched = true;
     }
 }
 
-void simpleTouchDownHandlerOnlyForSlider(struct TouchEvent * aCurrentPositionPtr) {
+void simpleTouchDownHandlerOnlyForSlider(struct TouchEvent *aCurrentPositionPtr) {
     if (TouchSlider::checkAllSliders(aCurrentPositionPtr->TouchPosition.PosX, aCurrentPositionPtr->TouchPosition.PosY)) {
         sSliderIsMoveTarget = true;
     } else {
@@ -662,7 +693,7 @@ void simpleTouchDownHandlerOnlyForSlider(struct TouchEvent * aCurrentPositionPtr
     }
 }
 
-void simpleTouchMoveHandlerForSlider(struct TouchEvent * aCurrentPositionPtr) {
+void simpleTouchMoveHandlerForSlider(struct TouchEvent *aCurrentPositionPtr) {
     TouchSlider::checkAllSliders(aCurrentPositionPtr->TouchPosition.PosX, aCurrentPositionPtr->TouchPosition.PosY);
 }
 

@@ -136,11 +136,13 @@ void initSimpleSerial(uint32_t aBaudRate) {
     remoteEvent.EventType = EVENT_NO_EVENT;
     remoteTouchDownEvent.EventType = EVENT_NO_EVENT;
 }
+#endif // USE_SIMPLE_SERIAL
 
 /**
  * ultra simple blocking USART send routine - works 100%!
  */
 void sendUSART(char aChar) {
+#ifdef USE_SIMPLE_SERIAL
     // wait for buffer to become empty
 #  if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1284__) || defined(__AVR_ATmega1284P__) || defined(__AVR_ATmega644__) || defined(__AVR_ATmega644A__) || defined(__AVR_ATmega644P__) || defined(__AVR_ATmega644PA__) || defined(ARDUINO_AVR_LEONARDO) || defined(__AVR_ATmega16U4__) || defined(__AVR_ATmega32U4__)
     // Use TX1 on MEGA and on Leonardo, which has no TX0
@@ -154,20 +156,21 @@ void sendUSART(char aChar) {
     }
     UDR0 = aChar;
 #  endif // Atmega...
+#else
+    Serial.write(aChar);
+#endif // USE_SIMPLE_SERIAL
 }
 
 //void USART_send(char aChar) {
 //    sendUSART(aChar);
 //}
 
-void sendUSART(const char * aString) {
+void sendUSART(const char *aString) {
     while (*aString != '0') {
         sendUSART(*aString);
         aString++;
     }
-
 }
-#endif // USE_SIMPLE_SERIAL
 
 /**
  * On Atmega328
@@ -186,18 +189,18 @@ bool sReceiveBufferOutOfSync = false;
 /**
  * The central point for sending bytes
  */
-void sendUSARTBufferNoSizeCheck(uint8_t * aParameterBufferPointer, int aParameterBufferLength, uint8_t * aDataBufferPointer,
+void sendUSARTBufferNoSizeCheck(uint8_t *aParameterBufferPointer, uint8_t aParameterBufferLength, uint8_t *aDataBufferPointer,
         int16_t aDataBufferLength) {
 #if ! defined(USE_SIMPLE_SERIAL)
     Serial.write(aParameterBufferPointer, aParameterBufferLength);
     Serial.write(aDataBufferPointer, aDataBufferLength);
 #else
-/*
- * Simple and reliable blocking version for Atmega328
- */
+    /*
+     * Simple and reliable blocking version for Atmega328
+     */
     while (aParameterBufferLength > 0) {
         // wait for USART send buffer to become empty
-#  if (defined(UCSR1A) && ! defined(USE_USB_SERIAL)) || ! defined (UCSR0A) // Use TX1 on MEGA and on Leonardo, which has no TX0
+#  if (defined(UCSR1A) && ! defined(USE_USB_SERIAL)) || ! defined(UCSR0A) // Use TX1 on MEGA and on Leonardo, which has no TX0
         while (!((UCSR1A) & (1 << UDRE1))) {
             ;
         }
@@ -214,7 +217,7 @@ void sendUSARTBufferNoSizeCheck(uint8_t * aParameterBufferPointer, int aParamete
     }
     while (aDataBufferLength > 0) {
         // wait for USART send buffer to become empty
-#  if (defined(UCSR1A) && ! defined(USE_USB_SERIAL)) || ! defined (UCSR0A) // Use TX1 on MEGA and on Leonardo, which has no TX0
+#  if (defined(UCSR1A) && ! defined(USE_USB_SERIAL)) || ! defined(UCSR0A) // Use TX1 on MEGA and on Leonardo, which has no TX0
         while (!((UCSR1A) & (1 << UDRE1))) {
             ;
         }
@@ -241,9 +244,9 @@ void sendUSARTBufferNoSizeCheck(uint8_t * aParameterBufferPointer, int aParamete
  */
 // using this function saves 300 bytes for SimpleDSO
 void sendUSART5Args(uint8_t aFunctionTag, uint16_t aXStart, uint16_t aYStart, uint16_t aXEnd, uint16_t aYEnd, uint16_t aColor) {
-    uint16_t tParamBuffer[MAX_NUMBER_OF_ARGS_FOR_BD_FUNCTIONS];
+    uint16_t tParamBuffer[7];
 
-    uint16_t * tBufferPointer = &tParamBuffer[0];
+    uint16_t *tBufferPointer = &tParamBuffer[0];
     *tBufferPointer++ = aFunctionTag << 8 | SYNC_TOKEN; // add sync token
     *tBufferPointer++ = 10; // parameter length
     *tBufferPointer++ = aXStart;
@@ -259,14 +262,14 @@ void sendUSART5Args(uint8_t aFunctionTag, uint16_t aXStart, uint16_t aYStart, ui
  * @param aFunctionTag
  * @param aNumberOfArgs currently not more than 12 args (SHORT) are supported
  */
-void sendUSARTArgs(uint8_t aFunctionTag, int aNumberOfArgs, ...) {
+void sendUSARTArgs(uint8_t aFunctionTag, uint8_t aNumberOfArgs, ...) {
     if (aNumberOfArgs > MAX_NUMBER_OF_ARGS_FOR_BD_FUNCTIONS) {
         return;
     }
 
     uint16_t tParamBuffer[MAX_NUMBER_OF_ARGS_FOR_BD_FUNCTIONS + 2];
     va_list argp;
-    uint16_t * tBufferPointer = &tParamBuffer[0];
+    uint16_t *tBufferPointer = &tParamBuffer[0];
     *tBufferPointer++ = aFunctionTag << 8 | SYNC_TOKEN; // add sync token
     va_start(argp, aNumberOfArgs);
 
@@ -282,16 +285,16 @@ void sendUSARTArgs(uint8_t aFunctionTag, int aNumberOfArgs, ...) {
  *
  * @param aFunctionTag
  * @param aNumberOfArgs currently not more than 12 args (SHORT) are supported
- * Last two arguments are length of buffer and buffer pointer (..., size_t aDataLength, uint8_t * aDataBufferPtr)
+ * Last two arguments are length of buffer and buffer pointer (..., size_t aDataLength, uint8_t *aDataBufferPtr)
  */
-void sendUSARTArgsAndByteBuffer(uint8_t aFunctionTag, int aNumberOfArgs, ...) {
+void sendUSARTArgsAndByteBuffer(uint8_t aFunctionTag, uint8_t aNumberOfArgs, ...) {
     if (aNumberOfArgs > MAX_NUMBER_OF_ARGS_FOR_BD_FUNCTIONS) {
         return;
     }
 
     uint16_t tParamBuffer[MAX_NUMBER_OF_ARGS_FOR_BD_FUNCTIONS + 4];
     va_list argp;
-    uint16_t * tBufferPointer = &tParamBuffer[0];
+    uint16_t *tBufferPointer = &tParamBuffer[0];
     *tBufferPointer++ = aFunctionTag << 8 | SYNC_TOKEN; // add sync token
     va_start(argp, aNumberOfArgs);
 
@@ -303,7 +306,7 @@ void sendUSARTArgsAndByteBuffer(uint8_t aFunctionTag, int aNumberOfArgs, ...) {
     *tBufferPointer++ = DATAFIELD_TAG_BYTE << 8 | SYNC_TOKEN; // start new transmission block
     uint16_t tLength = va_arg(argp, int); // length in byte
     *tBufferPointer++ = tLength;
-    uint8_t * aBufferPtr = (uint8_t *) va_arg(argp, int); // Buffer address
+    uint8_t *aBufferPtr = (uint8_t *) va_arg(argp, int); // Buffer address
     va_end(argp);
 
     sendUSARTBufferNoSizeCheck((uint8_t*) &tParamBuffer[0], aNumberOfArgs * 2 + 8, aBufferPtr, tLength);
@@ -359,7 +362,7 @@ ISR(USART1_RX_vect) {
                         // event completely received
                         // we have one dedicated touch down event in order not to overwrite it with other events before processing it
                         // Yes it makes no sense if interrupts are allowed!
-                        struct BluetoothEvent * tRemoteTouchEventPtr = &remoteEvent;
+                        struct BluetoothEvent *tRemoteTouchEventPtr = &remoteEvent;
 #  ifndef DO_NOT_NEED_BASIC_TOUCH
                         if (sReceivedEventType == EVENT_TOUCH_ACTION_DOWN
                                 || (remoteTouchDownEvent.EventType == EVENT_NO_EVENT && remoteEvent.EventType == EVENT_NO_EVENT)) {

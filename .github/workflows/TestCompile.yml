@@ -27,4 +27,5 @@ jobs:
         uses: ArminJo/arduino-test-compile@master
         with:
           sketch-names: SimpleTouchScreenDSO.cpp
+          build-properties: '{ "All": "-DUSE_SIMPLE_SERIAL" }'
 #          required-libraries: BlueDisplay

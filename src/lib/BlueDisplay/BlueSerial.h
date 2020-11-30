@@ -36,12 +36,15 @@
 #include <stddef.h>
 #endif
 
-//#define USE_STANDARD_SERIAL // vs. USE_SIMPLE_SERIAL - comment this out to override the default for AVR.
-#if !defined(USE_STANDARD_SERIAL) && defined (__AVR__)
+#if defined(__AVR__)
 // Simple serial is a simple blocking serial version without receive buffer and other overhead.
 // Using it saves up to 1250 byte FLASH and 185 byte RAM since USART is used directly
 // Simple serial on the MEGA2560 uses USART1
-#define USE_SIMPLE_SERIAL // default for AVR
+//#define USE_SIMPLE_SERIAL // only for AVR
+#endif
+
+#if defined(SERIAL_PORT_HARDWARE1) // is defined for Arduino Due
+#define BOARD_HAVE_USART2 // they start counting with 0
 #endif
 
 // If Serial1 is available, but you want to use direct connection by USB to your smartphone / tablet, then you have to comment out the next line
@@ -49,13 +52,13 @@
 
 /*
  * Determine which serial to use.
- * - Prefer the use of second USART, to have the standard Serial available for application (debug) use,
- *   except for direct connection to your smartphone / tablet by USB cable.
  * - Use standard Serial if USE_USB_SERIAL is requested.
- * - Use Serial1 on stm32 if SERIAL_USB and USART1 is existent. If no SERIAL_USB existent, it needs USART2 to have Serial1 available.
- * - Use Serial1 on AVR if second USART is existent, as on the ATMega Boards.
+ * - Prefer the use of second USART, to have the standard Serial available for application (debug) use except for ATmega328P and PB.
+ * - Use Serial1 on stm32 if SERIAL_USB and USART1 is existent. If no SERIAL_USB existent, it requires USART2 to have Serial1 available.
+ * - Use Serial1 on AVR if second USART is existent, as on the ATmega Boards.
  */
-#if ! defined(USE_USB_SERIAL) && ((defined(BOARD_HAVE_USART1) && defined(SERIAL_USB)) \
+// In some cores for ATmega328PB only ATmega328P is defined
+#if ! defined(USE_USB_SERIAL) && ! defined(__AVR_ATmega328P__) && ! defined(__AVR_ATmega328PB__) && ((defined(BOARD_HAVE_USART1) && defined(SERIAL_USB)) \
     || (defined(BOARD_HAVE_USART2) && ! defined(SERIAL_USB)) \
     || defined(UBRR1H))
 #define USE_SERIAL1
@@ -86,11 +89,14 @@
 /*
  * common functions
  */
-void sendUSARTArgs(uint8_t aFunctionTag, int aNumberOfArgs, ...);
-void sendUSARTArgsAndByteBuffer(uint8_t aFunctionTag, int aNumberOfArgs, ...);
+void sendUSARTArgs(uint8_t aFunctionTag, uint8_t aNumberOfArgs, ...);
+void sendUSARTArgsAndByteBuffer(uint8_t aFunctionTag, uint8_t aNumberOfArgs, ...);
 void sendUSART5Args(uint8_t aFunctionTag, uint16_t aXStart, uint16_t aYStart, uint16_t aXEnd, uint16_t aYEnd, uint16_t aColor);
 void sendUSART5ArgsAndByteBuffer(uint8_t aFunctionTag, uint16_t aXStart, uint16_t aYStart, uint16_t aXEnd, uint16_t aYEnd,
-        uint16_t aColor, uint8_t * aBufferPtr, size_t aBufferLength);
+        uint16_t aColor, uint8_t *aBufferPtr, size_t aBufferLength);
+// used internal by the above functions
+void sendUSARTBufferNoSizeCheck(uint8_t *aParameterBufferPointer, uint8_t aParameterBufferLength, uint8_t *aDataBufferPointer,
+        int16_t aDataBufferLength);
 
 #define PAIRED_PIN 5
 
@@ -113,9 +119,11 @@ void initSimpleSerial(uint32_t aBaudRate);
 
 extern bool allowTouchInterrupts;
 void sendUSART(char aChar);
-void sendUSART(const char * aChar);
+void sendUSART(const char *aChar);
 //void USART_send(char aChar);
 
 void serialEvent();
 
 #endif /* BLUESERIAL_H_ */
+
+#pragma once

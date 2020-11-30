@@ -22,8 +22,12 @@
 #define __FlashStringHelper char
 #define setCaptionPGM setCaption
 #define drawTextPGM drawText
+#  ifndef F
 #define F(a) a
+#  endif
+#  ifndef PSTR
 #define PSTR(a) a
+#  endif
 #endif
 
 #ifdef AVR
@@ -31,7 +35,7 @@
 #define DATABUFFER_SIZE (3*REMOTE_DISPLAY_WIDTH) //960
 #else
 #ifdef STM32F303xC
-#define DATABUFFER_SIZE_FACTOR 10
+#define DATABUFFER_SIZE_FACTOR 9
 #else
 #define DATABUFFER_SIZE_FACTOR 7
 #endif
@@ -57,8 +61,8 @@ extern uint8_t const ADCInputMUXChannels[ADC_CHANNEL_COUNT];
 #endif
 #define NUMBER_OF_CHANNELS_WITH_FIXED_ATTENUATOR 3 // Channel0 = /1, Ch1= /10, Ch2= /100
 
-extern const char * const ADCInputMUXChannelStrings[ADC_CHANNEL_COUNT];
-extern const char * const ChannelDivByButtonStrings[NUMBER_OF_CHANNELS_WITH_FIXED_ATTENUATOR];
+extern const char * const ADCInputMUXChannelStrings[];
+extern const char * const ChannelDivByButtonStrings[];
 
 /*
  * Trigger values
@@ -204,14 +208,14 @@ extern const float TimebaseExactDivValuesMicros[] PROGMEM;
 #define FONT_SIZE_INFO_LONG_ASC     TEXT_SIZE_11_ASCEND
 #define FONT_SIZE_INFO_LONG_WIDTH   TEXT_SIZE_11_WIDTH
 
-#define SLIDER_SIZE 24
+#define SLIDER_BAR_WIDTH 24
 #define SLIDER_VPICKER_POS_X        0 // Position of slider
-#define SLIDER_VPICKER_INFO_X       (SLIDER_VPICKER_POS_X + SLIDER_SIZE)
+#define SLIDER_VPICKER_INFO_X       (SLIDER_VPICKER_POS_X + SLIDER_BAR_WIDTH)
 #define SLIDER_VPICKER_INFO_SHORT_Y (FONT_SIZE_INFO_SHORT + FONT_SIZE_INFO_SHORT_ASC)
 #define SLIDER_VPICKER_INFO_LONG_Y  (2 * FONT_SIZE_INFO_LONG + FONT_SIZE_INFO_SHORT_ASC) // since font size is always 18
 
 #define SLIDER_TLEVEL_POS_X         (14 * FONT_SIZE_INFO_LONG_WIDTH) // Position of slider
-#define TRIGGER_LEVEL_INFO_SHORT_X  (SLIDER_TLEVEL_POS_X  + SLIDER_SIZE)
+#define TRIGGER_LEVEL_INFO_SHORT_X  (SLIDER_TLEVEL_POS_X  + SLIDER_BAR_WIDTH)
 #define TRIGGER_LEVEL_INFO_LONG_X   (INFO_LEFT_MARGIN + (36 * FONT_SIZE_INFO_LONG_WIDTH))
 #define TRIGGER_LEVEL_INFO_SHORT_Y  (FONT_SIZE_INFO_SHORT + FONT_SIZE_INFO_SHORT_ASC)
 #define TRIGGER_LEVEL_INFO_LONG_Y   FONT_SIZE_INFO_LONG_ASC
@@ -238,14 +242,14 @@ extern const float TimebaseExactDivValuesMicros[] PROGMEM;
 #define FONT_SIZE_INFO_LONG_WIDTH   TEXT_SIZE_14_WIDTH    // for 3 lines info
 #endif
 
-#define SLIDER_SIZE 24
+#define SLIDER_BAR_WIDTH 24
 #define SLIDER_VPICKER_POS_X        0 // Position of slider
-#define SLIDER_VPICKER_INFO_X       (SLIDER_VPICKER_POS_X + SLIDER_SIZE)
+#define SLIDER_VPICKER_INFO_X       (SLIDER_VPICKER_POS_X + SLIDER_BAR_WIDTH)
 #define SLIDER_VPICKER_INFO_SHORT_Y (FONT_SIZE_INFO_SHORT + FONT_SIZE_INFO_SHORT_ASC)
 #define SLIDER_VPICKER_INFO_LONG_Y  (3 * FONT_SIZE_INFO_LONG + FONT_SIZE_INFO_SHORT_ASC) // since font size is always 18
 
 #define SLIDER_TLEVEL_POS_X         (14 * FONT_SIZE_INFO_LONG_WIDTH) // Position of slider
-#define TRIGGER_LEVEL_INFO_SHORT_X  (SLIDER_TLEVEL_POS_X  + SLIDER_SIZE)
+#define TRIGGER_LEVEL_INFO_SHORT_X  (SLIDER_TLEVEL_POS_X  + SLIDER_BAR_WIDTH)
 #ifdef LOCAL_DISPLAY_EXISTS
 #define TRIGGER_LEVEL_INFO_LONG_X   (11 * FONT_SIZE_INFO_LONG_WIDTH)
 #else
@@ -376,7 +380,7 @@ void startSystemInfoPage(void);
 #endif
 
 // Text output section
-void printfTriggerDelay(char * aDataBufferPtr, uint16_t aTriggerDelayMillisOrMicros);
+void printfTriggerDelay(char *aDataBufferPtr, uint16_t aTriggerDelayMillisOrMicros);
 void printVCCAndTemperature(void);
 void clearInfo(uint8_t aOldMode);
 void printInfo(bool aRecomputeValues = true);
@@ -420,8 +424,8 @@ void doDrawMode(BDButton * aTheTouchedButton, int16_t aValue);
 #endif
 
 // Slider handler section
-void doTriggerLevel(BDSlider * aTheTouchedSlider, uint16_t aValue);
-void doVoltagePicker(BDSlider * aTheTouchedSlider, uint16_t aValue);
+void doTriggerLevel(BDSlider *aTheTouchedSlider, uint16_t aValue);
+void doVoltagePicker(BDSlider *aTheTouchedSlider, uint16_t aValue);
 
 // Button caption section
 #ifdef AVR
