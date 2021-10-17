@@ -40,8 +40,8 @@
 #include "WString.h"    // for __FlashStringHelper
 #endif
 
-#define BUTTON_AUTO_RED_GREEN_FALSE_COLOR COLOR_RED
-#define BUTTON_AUTO_RED_GREEN_TRUE_COLOR COLOR_GREEN
+#define BUTTON_AUTO_RED_GREEN_FALSE_COLOR COLOR16_RED
+#define BUTTON_AUTO_RED_GREEN_TRUE_COLOR COLOR16_GREEN
 
 // Flags for BUTTON_GLOBAL_SETTINGS
 static const int FLAG_BUTTON_GLOBAL_USE_DOWN_EVENTS_FOR_BUTTONS = 0x00; // Default
@@ -285,8 +285,8 @@ public:
     void removeButton(color16_t aBackgroundColor);
     void drawCaption(void);
     void setCaption(const char *aCaption, bool doDrawButton = false);
+    void setCaptionFromStringArray(const char *const aCaptionStringArrayPtr[], uint8_t aStringIndex, bool doDrawButton);
     void setCaptionForValueTrue(const char *aCaption);
-    void setCaptionAndDraw(const char *aCaption);
     void setValue(int16_t aValue, bool doDrawButton = false);
     void setValueAndDraw(int16_t aValue);
     void setButtonColor(color16_t aButtonColor);

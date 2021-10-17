@@ -179,7 +179,7 @@ uint16_t getTextMiddle(uint16_t aTextSize);
 /**********************
  * Constants used in protocol
  *********************/
-//#define COLOR_NO_BACKGROUND   ((color16_t)0XFFFE)
+//#define COLOR16_NO_BACKGROUND   ((color16_t)0XFFFE)
 static const float NUMBER_INITIAL_VALUE_DO_NOT_SHOW = 1e-40f;
 
 /**********************
@@ -280,8 +280,8 @@ public:
     void playFeedbackTone(uint8_t isError);
     void setLongTouchDownTimeout(uint16_t aLongTouchDownTimeoutMillis);
 
-    void clearDisplay(color16_t aColor = COLOR_WHITE);
-    void clearDisplayOptional(color16_t aColor = COLOR_WHITE);
+    void clearDisplay(color16_t aColor = COLOR16_WHITE);
+    void clearDisplayOptional(color16_t aColor = COLOR16_WHITE);
     void drawDisplayDirect(void);
     void setScreenOrientationLock(uint8_t aLockMode);
 
@@ -299,13 +299,13 @@ public:
     void drawText(uint16_t aXStart, uint16_t aYStart, const char *aStringPtr);
 
     uint16_t drawByte(uint16_t aPosX, uint16_t aPosY, int8_t aByte, uint16_t aTextSize = TEXT_SIZE_11, color16_t aFGColor =
-    COLOR_BLACK, color16_t aBGColor = COLOR_WHITE);
+    COLOR16_BLACK, color16_t aBGColor = COLOR16_WHITE);
     uint16_t drawUnsignedByte(uint16_t aPosX, uint16_t aPosY, uint8_t aUnsignedByte, uint16_t aTextSize = TEXT_SIZE_11,
-            color16_t aFGColor = COLOR_BLACK, color16_t aBGColor = COLOR_WHITE);
+            color16_t aFGColor = COLOR16_BLACK, color16_t aBGColor = COLOR16_WHITE);
     uint16_t drawShort(uint16_t aPosX, uint16_t aPosY, int16_t aShort, uint16_t aTextSize = TEXT_SIZE_11, color16_t aFGColor =
-    COLOR_BLACK, color16_t aBGColor = COLOR_WHITE);
+    COLOR16_BLACK, color16_t aBGColor = COLOR16_WHITE);
     uint16_t drawLong(uint16_t aPosX, uint16_t aPosY, int32_t aLong, uint16_t aTextSize = TEXT_SIZE_11, color16_t aFGColor =
-    COLOR_BLACK, color16_t aBGColor = COLOR_WHITE);
+    COLOR16_BLACK, color16_t aBGColor = COLOR16_WHITE);
 
     void setWriteStringSizeAndColorAndFlag(uint16_t aPrintSize, color16_t aPrintColor, color16_t aPrintBackgroundColor,
             bool aClearOnNewScreen);
@@ -380,7 +380,7 @@ public:
     void drawMLText(uint16_t aPosX, uint16_t aPosY, const char *aStringPtr, uint16_t aTextSize, color16_t aFGColor, color16_t aBGColor);
 #endif
 
-#ifdef AVR
+
     uint16_t drawTextPGM(uint16_t aXStart, uint16_t aYStart, const char *aPGMString, uint16_t aTextSize, color16_t aFGColor,
             color16_t aBGColor);
     void drawTextPGM(uint16_t aXStart, uint16_t aYStart, const char *aPGMString);
@@ -394,6 +394,7 @@ public:
     void getNumberWithShortPrompt(void (*aNumberHandler)(float), const __FlashStringHelper *aPGMShortPromptString,
             float aInitialValue);
 
+#ifdef AVR
     // Not yet implemented    void getTextWithShortPromptPGM(void (*aTextHandler)(const char *), const __FlashStringHelper *aPGMShortPromptString);
 
     void printVCCAndTemperaturePeriodically(uint16_t aXPos, uint16_t aYPos, uint16_t aTextSize, uint16_t aPeriodMillis);
@@ -474,14 +475,18 @@ void clearDisplayAndDisableButtonsAndSliders();
 void clearDisplayAndDisableButtonsAndSliders(color16_t aColor);
 
 #ifdef LOCAL_DISPLAY_EXISTS
-#include <MI0283QT2.h>
-
 /*
  * MI0283QT2 TFTDisplay - must provided by main program
  * external declaration saves ROM (210 Bytes) and RAM ( 20 Bytes)
  * and avoids missing initialization :-)
  */
+#if defined(USE_HY32D)
+#include "SSD1289.h"
+extern SSD1289 LocalDisplay;
+#else
+#include "MI0283QT2.h"
 extern MI0283QT2 LocalDisplay;
+#endif
 // to be provided by local display library
 extern const unsigned int LOCAL_DISPLAY_HEIGHT;
 extern const unsigned int LOCAL_DISPLAY_WIDTH;
