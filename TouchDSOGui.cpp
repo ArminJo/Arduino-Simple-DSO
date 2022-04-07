@@ -19,12 +19,15 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <http://www.gnu.org/licenses/gpl.html>.
+ *  along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
  *
  */
 
+#define SUPPRESS_HPP_WARNING
+
 #if defined(AVR)
 #include <Arduino.h>
+
 #include "SimpleTouchScreenDSO.h"
 #include "digitalWriteFast.h"
 #else
@@ -32,9 +35,8 @@
 #include "TouchDSO.h"
 
 #include "Chart.h" // for adjustIntWithScaleFactor()
-#endif
-
 #include "BlueDisplay.h"
+#endif // defined(AVR)
 
 uint8_t sLastPickerValue;
 
@@ -502,7 +504,7 @@ const char sTriggerModeButtonStringManualTimeout[] PROGMEM = "Trigger\nman timeo
 const char sTriggerModeButtonStringManual[] PROGMEM = "Trigger\nman";
 const char sTriggerModeButtonStringFreeRunning[] PROGMEM = "Trigger\nfree";
 const char sTriggerModeButtonStringExternal[] PROGMEM = "Trigger\next";
-const char * const sTriggerModeButtonCaptionStringArray[] PROGMEM = { sTriggerModeButtonStringAuto,
+const char *const sTriggerModeButtonCaptionStringArray[] PROGMEM = { sTriggerModeButtonStringAuto,
         sTriggerModeButtonStringManualTimeout, sTriggerModeButtonStringManual, sTriggerModeButtonStringFreeRunning,
         sTriggerModeButtonStringExternal };
 
@@ -522,7 +524,7 @@ const char StringTemperature[] PROGMEM = "Temp";
 const char StringVRefint[] PROGMEM = "VRef";
 const char StringVBattDiv2[] PROGMEM = "\xBD" "VBatt";
 #if defined(AVR)
-const char * const ADCInputMUXChannelStrings[] = { StringChannel0, StringChannel1, StringChannel2, StringChannel3, StringChannel4,
+const char *const ADCInputMUXChannelStrings[] = { StringChannel0, StringChannel1, StringChannel2, StringChannel3, StringChannel4,
         StringTemperature, StringVRefint };
 #else
 #if defined(STM)32F30X
@@ -540,15 +542,15 @@ const uint8_t ADCInputMUXChannels[] = {ADC_CHANNEL_0, ADC_CHANNEL_1, ADC_CHANNEL
 const char ChannelDivBy1ButtonString[] PROGMEM = "\xF7" "1";
 const char ChannelDivBy10ButtonString[] PROGMEM = "\xF7" "10";
 const char ChannelDivBy100ButtonString[] PROGMEM = "\xF7" "100";
-const char * const ChannelDivByButtonStrings[] = { ChannelDivBy1ButtonString,
-        ChannelDivBy10ButtonString, ChannelDivBy100ButtonString };
+const char *const ChannelDivByButtonStrings[] =
+        { ChannelDivBy1ButtonString, ChannelDivBy10ButtonString, ChannelDivBy100ButtonString };
 BDButton TouchButtonChannelMode;
 
 BDButton TouchButtonAutoOffsetMode;
 const char AutoOffsetButtonString0[] PROGMEM = "Offset\n0V";
 const char AutoOffsetButtonStringAuto[] PROGMEM = "Offset\nauto";
 const char AutoOffsetButtonStringMan[] PROGMEM = "Offset\nman";
-const char * const sAutoOffsetButtonCaptionStringArray[] PROGMEM = { AutoOffsetButtonString0, AutoOffsetButtonStringAuto,
+const char *const sAutoOffsetButtonCaptionStringArray[] PROGMEM = { AutoOffsetButtonString0, AutoOffsetButtonStringAuto,
         AutoOffsetButtonStringMan };
 
 BDButton TouchButtonAutoRangeOnOff;
@@ -685,7 +687,7 @@ void initDSOGUI(void) {
 
 // Button for channel select
     TouchButtonChannelSelect.init(REMOTE_DISPLAY_WIDTH - BUTTON_WIDTH_6, tPosY, BUTTON_WIDTH_6, SETTINGS_PAGE_BUTTON_HEIGHT,
-    BUTTON_AUTO_RED_GREEN_FALSE_COLOR, reinterpret_cast<const __FlashStringHelper *>(StringChannel3), TEXT_SIZE_11,
+    BUTTON_AUTO_RED_GREEN_FALSE_COLOR, reinterpret_cast<const __FlashStringHelper*>(StringChannel3), TEXT_SIZE_11,
             FLAG_BUTTON_DO_BEEP_ON_TOUCH, 42, &doChannelSelect);
 
 // 4. row
@@ -1257,7 +1259,8 @@ void setAutoRangeModeAndButtonCaption(bool aNewAutoRangeMode) {
 }
 
 void setAutoOffsetButtonCaption(void) {
-    TouchButtonAutoOffsetMode.setCaptionFromStringArrayPGM(sAutoOffsetButtonCaptionStringArray, MeasurementControl.OffsetMode, (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS));
+    TouchButtonAutoOffsetMode.setCaptionFromStringArrayPGM(sAutoOffsetButtonCaptionStringArray, MeasurementControl.OffsetMode,
+            (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS));
 }
 
 void setACModeButtonCaption(void) {
@@ -1314,7 +1317,7 @@ void startDSOSettingsPage(void) {
  * Use touch up in order not to interfere with long touch
  * Switch between upper info line short/long/off
  */
-void doSwitchInfoModeOnTouchUp(struct TouchEvent * const aTouchPosition) {
+void doSwitchInfoModeOnTouchUp(struct TouchEvent *const aTouchPosition) {
 #if defined(LOCAL_DISPLAY_EXISTS)
 // first check for buttons
     if (!TouchButton::checkAllButtons(aTouchPosition->TouchPosition.PosX, aTouchPosition->TouchPosition.PosY)) {
@@ -1351,7 +1354,7 @@ void doSwitchInfoModeOnTouchUp(struct TouchEvent * const aTouchPosition) {
  * If stopped toggle between Start and Chart page
  * If running toggle between gui display and chart only
  */
-void doLongTouchDownDSO(struct TouchEvent * const aTochPosition) {
+void doLongTouchDownDSO(struct TouchEvent *const aTochPosition) {
     static bool sIsGUIVisible = false;
     if (DisplayControl.DisplayPage == DISPLAY_PAGE_CHART) {
         if (MeasurementControl.isRunning) {
@@ -1378,7 +1381,7 @@ void doLongTouchDownDSO(struct TouchEvent * const aTochPosition) {
 /**
  * responsible for swipe detection and dispatching
  */
-void doSwipeEndDSO(struct Swipe * const aSwipeInfo) {
+void doSwipeEndDSO(struct Swipe *const aSwipeInfo) {
 #if defined(AVR)
     uint8_t tFeedbackType = FEEDBACK_TONE_ERROR;
 #else
@@ -1458,19 +1461,19 @@ void doSwipeEndDSO(struct Swipe * const aSwipeInfo) {
 /*
  * default handler for back button
  */
-void doDefaultBackButton(BDButton * aTheTouchedButton, int16_t aValue) {
+void doDefaultBackButton(BDButton *aTheTouchedButton, int16_t aValue) {
     sBackButtonPressed = true;
 }
 
 /*
  * show gui of settings screen
  */
-void doShowSettingsPage(BDButton * aTheTouchedButton, int16_t aValue) {
+void doShowSettingsPage(BDButton *aTheTouchedButton, int16_t aValue) {
     DisplayControl.DisplayPage = DISPLAY_PAGE_SETTINGS;
     redrawDisplay();
 }
 
-void doShowFrequencyPage(BDButton * aTheTouchedButton, int16_t aValue) {
+void doShowFrequencyPage(BDButton *aTheTouchedButton, int16_t aValue) {
     DisplayControl.DisplayPage = DISPLAY_PAGE_FREQUENCY;
     startFrequencyGeneratorPage();
 }
@@ -1478,7 +1481,7 @@ void doShowFrequencyPage(BDButton * aTheTouchedButton, int16_t aValue) {
 /*
  * toggle between ascending and descending trigger slope
  */
-void doTriggerSlope(BDButton * aTheTouchedButton, int16_t aValue) {
+void doTriggerSlope(BDButton *aTheTouchedButton, int16_t aValue) {
     MeasurementControl.TriggerSlopeRising = (!MeasurementControl.TriggerSlopeRising);
     setTriggerLevelAndHysteresis(MeasurementControl.RawTriggerLevel, MeasurementControl.RawHysteresis);
     setSlopeButtonCaption();
@@ -1487,7 +1490,7 @@ void doTriggerSlope(BDButton * aTheTouchedButton, int16_t aValue) {
 /*
  * switch between automatic, manual, free and external trigger mode
  */
-void doTriggerMode(BDButton * aTheTouchedButton, int16_t aValue) {
+void doTriggerMode(BDButton *aTheTouchedButton, int16_t aValue) {
     uint8_t tNewMode = MeasurementControl.TriggerMode + 1;
     if (tNewMode > TRIGGER_MODE_EXTERN) {
         tNewMode = TRIGGER_MODE_AUTOMATIC;
@@ -1505,7 +1508,7 @@ void doTriggerMode(BDButton * aTheTouchedButton, int16_t aValue) {
     setTriggerModeButtonCaption();
 }
 
-void doRangeMode(BDButton * aTheTouchedButton, int16_t aValue) {
+void doRangeMode(BDButton *aTheTouchedButton, int16_t aValue) {
     setAutoRangeModeAndButtonCaption(!MeasurementControl.RangeAutomatic);
 }
 
@@ -1513,7 +1516,7 @@ void doRangeMode(BDButton * aTheTouchedButton, int16_t aValue) {
  * step from 0 volt to auto to manual offset
  * No auto offset in AC Mode for AVR
  */
-void doOffsetMode(BDButton * aTheTouchedButton, int16_t aValue) {
+void doOffsetMode(BDButton *aTheTouchedButton, int16_t aValue) {
     MeasurementControl.OffsetMode++;
     if (MeasurementControl.OffsetMode > OFFSET_MODE_MANUAL) {
         // switch back from Mode Manual to mode 0 volt and set range mode to automatic
@@ -1537,7 +1540,7 @@ void doOffsetMode(BDButton * aTheTouchedButton, int16_t aValue) {
 /*
  * Cycle through all external and internal adc channels if button value is > 20
  */
-void doChannelSelect(BDButton * aTheTouchedButton, int16_t aValue) {
+void doChannelSelect(BDButton *aTheTouchedButton, int16_t aValue) {
 #if defined(LOCAL_DISPLAY_EXISTS)
     if (MeasurementControl.ADS7846ChannelsAsDatasource) {
 // ADS7846 channels
@@ -1591,7 +1594,7 @@ void doChannelSelect(BDButton * aTheTouchedButton, int16_t aValue) {
 /*
  *  Toggle history mode
  */
-void doChartHistory(BDButton * aTheTouchedButton, int16_t aValue) {
+void doChartHistory(BDButton *aTheTouchedButton, int16_t aValue) {
     DisplayControl.showHistory = aValue;
     if (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS) {
         aTheTouchedButton->drawButton();
@@ -1611,7 +1614,7 @@ void doChartHistory(BDButton * aTheTouchedButton, int16_t aValue) {
 /*
  * set to singleshot mode and draw an indicating "S" for AVR
  */
-void doStartSingleshot(BDButton * aTheTouchedButton, int16_t aValue) {
+void doStartSingleshot(BDButton *aTheTouchedButton, int16_t aValue) {
     aTheTouchedButton->deactivate();
     MeasurementControl.isSingleShotMode = true;
 
@@ -1720,7 +1723,7 @@ void doVoltagePicker(BDSlider *aTheTouchedSlider, uint16_t aValue) {
 /*
  * Request delay value as number
  */
-void doPromptForTriggerDelay(BDButton * aTheTouchedButton, int16_t aValue) {
+void doPromptForTriggerDelay(BDButton *aTheTouchedButton, int16_t aValue) {
     BlueDisplay1.getNumberWithShortPrompt(&doSetTriggerDelay, F("Trigger delay [\xB5s]"));
 }
 
