@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@master
 
 #      - name: Checkout custom library
-#        uses: actions/checkout@v2
+#        uses: actions/checkout@v3
 #        with:
 #          repository: ArminJo/Arduino-BlueDisplay
 #          ref: master
@@ -26,6 +26,6 @@ jobs:
       - name: Compile all examples
         uses: ArminJo/arduino-test-compile@master
         with:
-          sketch-names: SimpleTouchScreenDSO.cpp
+          sketch-names: SimpleDSO.cpp
           build-properties: '{ "All": "-DUSE_SIMPLE_SERIAL" }'
           required-libraries: BlueDisplay

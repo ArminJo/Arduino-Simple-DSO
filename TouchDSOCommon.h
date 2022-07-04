@@ -35,7 +35,7 @@
 // Data buffer size (must be small enough to leave appr. 7 % (144 Byte) for stack
 #define DATABUFFER_SIZE (3*REMOTE_DISPLAY_WIDTH) //960
 #else
-#if defined(STM)32F303xC
+#if defined(STM32F303xC)
 #define DATABUFFER_SIZE_FACTOR 9
 #else
 #define DATABUFFER_SIZE_FACTOR 7
@@ -53,7 +53,7 @@
 #define ADC_CHANNEL_COUNT ((MAX_ADC_EXTERNAL_CHANNEL + 1) + 2) // The number of external and internal ADC channels
 #else
 #define START_ADC_CHANNEL_INDEX 0  // see also ChannelSelectButtonString
-#if defined(STM)32F303xC
+#if defined(STM32F303xC)
 #define ADC_CHANNEL_COUNT 6 // The number of ADC channels
 #else
 #define ADC_CHANNEL_COUNT 6 // The number of ADC channels
@@ -146,7 +146,7 @@ extern const char * const ChannelDivByButtonStrings[];
 #define TIMEBASE_FAST_MODES 7 // first modes are fast DMA modes
 #define TIMEBASE_INDEX_DRAW_WHILE_ACQUIRE 17 // min index where chart is drawn while buffer is filled
 #define TIMEBASE_INDEX_CAN_USE_OVERSAMPLING 11 // min index where Min/Max oversampling is enabled
-#if defined(STM)32F303xC
+#if defined(STM32F303xC)
 #define TIMEBASE_NUMBER_START 1  // first reasonable Timebase to display - 0 if interleaving is realized
 #define TIMEBASE_NUMBER_OF_XSCALE_CORRECTION 5  // number of timebase which are simulated by display XSale factor
 #else
@@ -282,7 +282,7 @@ extern BDButton TouchButtonDrawModeTriggerLine;
 extern BDButton TouchButtonDrawModeLinePixel;
 extern BDButton TouchButtonADS7846TestOnOff;
 extern BDSlider TouchSliderBacklight;
-#endif
+#endif // LOCAL_DISPLAY_EXISTS
 
 extern BDButton TouchButtonSingleshot;
 extern BDButton TouchButtonStartStopDSOMeasurement;
@@ -388,8 +388,8 @@ void printInfo(bool aRecomputeValues = true);
 void printTriggerInfo(void);
 
 // GUI event handler section
-void doSwitchInfoModeOnTouchUp(struct TouchEvent * const aTochPosition);
-void doLongTouchDownDSO(struct TouchEvent * const aTochPosition);
+void doSwitchInfoModeOnTouchUp(struct TouchEvent * const aTouchPosition);
+void doLongTouchDownDSO(struct TouchEvent * const aTouchPosition);
 void doSwipeEndDSO(struct Swipe * const aSwipeInfo);
 void doSetTriggerDelay(float aValue);
 
@@ -418,11 +418,12 @@ void doPromptForTriggerDelay(BDButton * aTheTouchedButton, int16_t aValue);
 void doChannelSelect(BDButton * aTheTouchedButton, int16_t aValue);
 void doOffsetMode(BDButton * aTheTouchedButton, int16_t aValue);
 void doAcDcMode(BDButton * aTheTouchedButton, int16_t aValue);
+
 #if defined(LOCAL_DISPLAY_EXISTS)
 void readADS7846Channels(void);
 void doADS7846TestOnOff(BDButton * aTheTouchedButton, int16_t aValue);
 void doDrawMode(BDButton * aTheTouchedButton, int16_t aValue);
-#endif
+#endif // LOCAL_DISPLAY_EXISTS
 
 // Slider handler section
 void doTriggerLevel(BDSlider *aTheTouchedSlider, uint16_t aValue);
@@ -452,4 +453,3 @@ uint32_t getMicrosFromHorizontalDisplayValue(uint16_t aDisplayValueHorizontal, u
 #endif
 
 #endif // _TOUCH_DSO_COMMON_H
-#pragma once
