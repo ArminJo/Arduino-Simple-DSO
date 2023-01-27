@@ -1,9 +1,23 @@
 /*
- * SimpleTouchScreenDSO.h
+ * SimpleDSO.h
  *
- *  Copyright (C) 2015  Armin Joachimsmeyer
+ *  Copyright (C) 2015-2023  Armin Joachimsmeyer
  *  Email: armin.joachimsmeyer@gmail.com
- *  License: GPL v3 (http://www.gnu.org/licenses/gpl.html)
+ *
+ *  This file is part of Arduino-Simple-DSO https://github.com/ArminJo/Arduino-Simple-DSO.
+ *
+ *  Arduino-Simple-DSO is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *  See the GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
  */
 
 #ifndef _SIMPLE_TOUCHSCREEN_DSO_H
@@ -34,12 +48,6 @@
 #endif
 
 #define MILLIS_BETWEEN_INFO_OUTPUT 1000
-
-/*
- *  Display size
- */
-#define REMOTE_DISPLAY_HEIGHT   256 // we use 8 bit resolution and have 256 different analog values
-#define REMOTE_DISPLAY_WIDTH    DISPLAY_HALF_VGA_WIDTH // 320
 
 #define THOUSANDS_SEPARATOR '.'
 
@@ -97,9 +105,9 @@
 /*
  * External attenuator values
  */
-#define ATTENUATOR_TYPE_NO_ATTENUATOR 0     // No attenuator at all. Start with aRef = VCC -> see ATTENUATOR_DETECT_PIN_0
-#define ATTENUATOR_TYPE_FIXED_ATTENUATOR 1  // Fixed attenuator at Channel0,1,2 assume manual AC/DC switch
-#define ATTENUATOR_TYPE_ACTIVE_ATTENUATOR 2 // to be developed
+#define ATTENUATOR_TYPE_NO_ATTENUATOR       0 // No attenuator at all. Start with aRef = VCC -> see ATTENUATOR_DETECT_PIN_0
+#define ATTENUATOR_TYPE_FIXED_ATTENUATOR    1 // Fixed attenuator at Channel0, 1, 2
+#define ATTENUATOR_TYPE_ACTIVE_ATTENUATOR   2 // to be developed
 #define NUMBER_OF_CHANNEL_WITH_ACTIVE_ATTENUATOR 2
 
 struct MeasurementControlStruct {
@@ -110,10 +118,10 @@ struct MeasurementControlStruct {
     bool isSingleShotMode;
 
     float VCC; // Volt of VCC
-    uint8_t ADCReference; // DEFAULT = 1 =VCC   INTERNAL = 3 = 1.1 volt
+    uint8_t ADCReferenceShifted; // DEFAULT = 1 =VCC   INTERNAL = 3 = 1.1 volt
 
     // Input select
-    uint8_t ADCInputMUXChannelIndex;
+    uint8_t ADMUXChannel;
     uint8_t AttenuatorType; //ATTENUATOR_TYPE_NO_ATTENUATOR, ATTENUATOR_TYPE_SIMPLE_ATTENUATOR, ATTENUATOR_TYPE_ACTIVE_ATTENUATOR
     bool ChannelHasActiveAttenuator;
 
@@ -175,14 +183,17 @@ extern struct MeasurementControlStruct MeasurementControl;
 
 // values for DisplayPage
 // using enums increases code size by 120 bytes for Arduino
-#define DISPLAY_PAGE_START 0    // Start GUI
-#define DISPLAY_PAGE_CHART 1    // Chart in analyze and running mode
-#define DISPLAY_PAGE_SETTINGS 2
-#define DISPLAY_PAGE_FREQUENCY 3
-#if !defined(AVR)
-#define DISPLAY_PAGE_MORE_SETTINGS 4
-#define DISPLAY_PAGE_SYST_INFO 5
+#define DSO_PAGE_START      0    // Start GUI
+#define DSO_PAGE_CHART      1    // Chart in analyze and running mode
+#define DSO_PAGE_SETTINGS   2
+#define DSO_PAGE_FREQUENCY  3
+#ifndef AVR
+#define DSO_PAGE_MORE_SETTINGS 4
+#define DSO_PAGE_SYST_INFO  5
 #endif
+
+#define DSO_SUB_PAGE_MAIN   0
+#define DSO_SUB_PAGE_FFT    1
 
 // modes for showInfoMode
 #define INFO_MODE_NO_INFO 0
@@ -192,7 +203,9 @@ struct DisplayControlStruct {
     uint8_t TriggerLevelDisplayValue; // For clearing old line of manual trigger level setting
     int8_t XScale; // Factor for X Data expansion(>0)  0 = no scale, 2->display 1 value 2 times etc.
 
-    uint8_t DisplayPage;
+    uint8_t DisplayPage; // START, CHART, SETTINGS, MORE_SETTINGS
+    uint8_t DisplaySubPage; // DSO_SUB_PAGE_FFT
+
     bool DrawWhileAcquire;
     uint8_t showInfoMode;
 
@@ -205,7 +218,7 @@ extern DisplayControlStruct DisplayControl;
  * Data buffer
  */
 struct DataBufferStruct {
-    uint8_t DisplayBuffer[REMOTE_DISPLAY_WIDTH];
+    uint8_t DisplayBuffer[DISPLAY_WIDTH];
     uint8_t * DataBufferNextInPointer;
     uint8_t * DataBufferNextDrawPointer; // pointer to DataBuffer - for draw-while-acquire mode
     uint16_t DataBufferNextDrawIndex; // index in DisplayBuffer - for draw-while-acquire mode
@@ -213,7 +226,7 @@ struct DataBufferStruct {
     uint8_t * DataBufferEndPointer;
     // Used to synchronize ISR with main loop
     bool DataBufferFull;
-    // AcqusitionSize is REMOTE_DISPLAY_WIDTH except on last acquisition before stop then it is DATABUFFER_SIZE
+    // AcqusitionSize is DISPLAY_WIDTH except on last acquisition before stop then it is DATABUFFER_SIZE
     uint16_t AcquisitionSize;
     // Pointer for horizontal scrolling
     uint8_t * DataBufferDisplayStart;

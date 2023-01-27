@@ -1,7 +1,7 @@
 # TestCompile.yml
 # Github workflow script to test compile all examples of an Arduino library repository.
 #
-# Copyright (C) 2020  Armin Joachimsmeyer
+# Copyright (C) 2020-2023  Armin Joachimsmeyer
 # https://github.com/ArminJo/Github-Actions
 #
 
@@ -16,16 +16,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@master
 
-#      - name: Checkout custom library
-#        uses: actions/checkout@v3
-#        with:
-#          repository: ArminJo/Arduino-BlueDisplay
-#          ref: master
-#          path: CustomLibrary_BlueDisplay # must contain string "Custom"
+      - name: Checkout new BlueDisplay library
+        uses: actions/checkout@v3
+        with:
+          repository: ArminJo/Arduino-BlueDisplay
+          ref: master
+          path: CustomLibrary_BD # must contain string "Custom"
+          # Must remove BlueDisplay from REQUIRED_LIBRARIES
 
       - name: Compile all examples
         uses: ArminJo/arduino-test-compile@master
         with:
-          sketch-names: SimpleDSO.cpp
-          build-properties: '{ "All": "-DUSE_SIMPLE_SERIAL" }'
-          required-libraries: BlueDisplay
+          sketch-names: SimpleDSO.ino
+#          required-libraries: BlueDisplay

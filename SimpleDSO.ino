@@ -13,8 +13,8 @@
  *
  *  This program is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *  See the GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
@@ -160,37 +160,26 @@
 #include <Arduino.h>
 
 /*
- * Enabling program features dependent on display configuration
- */
-//#define LOCAL_DISPLAY_EXISTS    // Activate, if a local display is attached and should be drawn simultaneously
-//#define USE_HY32D               // Activate, if local display is a HY32D / SSD1289 type. Otherwise a MI0283QT2 type is assumed.
-
-/*
  * Settings to configure the BlueDisplay library and to reduce its size
  */
+#define DISPLAY_HEIGHT   256 // We use 8 bit resolution and have 256 different analog values
+#define DISPLAY_WIDTH    320 // Use the size of the local LCD screens available
 //#define BLUETOOTH_BAUD_RATE BAUD_115200  // Activate this, if you have reprogrammed the HC05 module for 115200, otherwise 9600 is used as baud rate
 //#define DO_NOT_NEED_BASIC_TOUCH_EVENTS // Disables basic touch events like down, move and up. Saves 620 bytes program memory and 36 bytes RAM
 #define USE_SIMPLE_SERIAL // Do not use the Serial object. Saves up to 1250 bytes program memory and 185 bytes RAM, if Serial is not used otherwise
-//#define SUPPORT_LOCAL_DISPLAY // Supports simultaneously drawing on a locally attached display. Not (yet) implemented for all commands!
+#if !defined(USE_SIMPLE_SERIAL)
+#error SimpleDSO works only with USE_SIMPLE_SERIAL activated, since the serial interrupts kill the DSO timing!
+#endif
 #include "BlueDisplay.hpp"
 
-#if defined(SUPPORT_LOCAL_DISPLAY) && !defined(LOCAL_DISPLAY_EXISTS)
-#error SUPPORT_LOCAL_DISPLAY is defined but no local display seems to be attached since LOCAL_DISPLAY_EXISTS is not defined.
-#endif
-
 #include "SimpleDSO.h"
+#include "LocalDisplay/digitalWriteFast.h"
 #include "FrequencyGeneratorPage.hpp" // include sources
 #include "TouchDSOGui.hpp" // include sources
 
-#include "digitalWriteFast.h"
-
-#if ! defined(USE_SIMPLE_SERIAL)
-#error TouchScreenDSO works only with USE_SIMPLE_SERIAL activated, since the serial interrupts kill the DSO timing!
-#endif
 /**********************
  * Buttons
  *********************/
-
 BDButton TouchButtonBack;
 // global flag for page control. Is evaluated by calling loop or page and set by buttonBack handler
 bool sBackButtonPressed;
@@ -209,8 +198,8 @@ bool sBackButtonPressed;
 #define TOIE2  TOIE3
 #endif
 
-#define ADC_TEMPERATURE_CHANNEL 8
-#define ADC_1_1_VOLT_CHANNEL 0x0E
+#define ADC_TEMPERATURE_CHANNEL 0x08
+#define ADC_1_1_VOLT_CHANNEL    0x0E
 
 /*
  * Timebase values overview:                                              Polling mode
@@ -362,7 +351,7 @@ void drawRemainingDataBufferValues(void);
 float getTemperature(void);
 void setVCCValue(void);
 inline void setPrescaleFactor(uint8_t aFactor);
-void setADCReference(uint8_t aReference);
+void setADCReferenceShifted(uint8_t aReferenceShifted);
 void setTimer2FastPWMOutput();
 void initTimer2(void);
 
@@ -374,7 +363,7 @@ void initTimer2(void);
 void initDisplay(void) {
     BlueDisplay1.setFlagsAndSize(
             BD_FLAG_FIRST_RESET_ALL | BD_FLAG_USE_MAX_SIZE | BD_FLAG_LONG_TOUCH_ENABLE | BD_FLAG_ONLY_TOUCH_MOVE_DISABLE,
-            REMOTE_DISPLAY_WIDTH, REMOTE_DISPLAY_HEIGHT);
+            DISPLAY_WIDTH, DISPLAY_HEIGHT);
     BlueDisplay1.setCharacterMapping(0xD1, 0x21D1); // Ascending in UTF16 - for printInfo()
     BlueDisplay1.setCharacterMapping(0xD2, 0x21D3); // Descending in UTF16 - for printInfo()
     BlueDisplay1.setCharacterMapping(0xD4, 0x2227); // UP (logical AND) in UTF16
@@ -472,11 +461,10 @@ void setup() {
     MeasurementControl.RawDSOReadingACZero = 0x200;
 
     delay(100);
-    setVCCValue();
 
     setChannel(tStartChannel); // outputs button caption!
     /*
-     * setChannel() needs:
+     * setChannel() requires:
      * AttenuatorType
      * isACMode
      * VCC
@@ -490,7 +478,7 @@ void setup() {
      * ChannelHasAttenuator
      * isACModeANDChannelHasAttenuator
      * AttenuatorValue
-     * ADCReference
+     * ADCReferenceShifted
      *
      * setChannel calls setInputRange(2,2) and this sets:
      * OffsetValue
@@ -505,7 +493,7 @@ void setup() {
 
     DisplayControl.EraseColor = COLOR_BACKGROUND_DSO;
     DisplayControl.showHistory = false;
-    DisplayControl.DisplayPage = DISPLAY_PAGE_START;
+    DisplayControl.DisplayPage = DSO_PAGE_START;
     DisplayControl.showInfoMode = INFO_MODE_SHORT_INFO;
 
     //setACMode(!digitalReadFast(AC_DC_PIN));
@@ -522,13 +510,12 @@ void setup() {
     registerTouchUpCallback(&doSwitchInfoModeOnTouchUp);
     registerLongTouchDownCallback(&doLongTouchDownDSO, 900);
 
-    BlueDisplay1.playFeedbackTone(FEEDBACK_TONE_OK);
+    BDButton::playFeedbackTone();
     delay(400);
-    setVCCValue();
-    BlueDisplay1.playFeedbackTone(FEEDBACK_TONE_OK);
+    setVCCValue(); // this sets ADMUX to 1.1 volt reference channel
+    BDButton::playFeedbackTone();
 
     initStackFreeMeasurement();
-
 }
 
 /************************************************************************
@@ -581,7 +568,7 @@ void __attribute__((noreturn)) loop(void) {
                     if (sDoInfoOutput) {
                         sDoInfoOutput = false;
 
-                        if (DisplayControl.DisplayPage == DISPLAY_PAGE_CHART) {
+                        if (DisplayControl.DisplayPage == DSO_PAGE_CHART) {
                             if (!DisplayControl.showHistory) {
                                 // This enables slow display devices to skip frames
                                 BlueDisplay1.clearDisplayOptional(COLOR_BACKGROUND_DSO);
@@ -590,14 +577,14 @@ void __attribute__((noreturn)) loop(void) {
                             if (DisplayControl.showInfoMode != INFO_MODE_NO_INFO) {
                                 printInfo();
                             }
-                        } else if (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS) {
+                        } else if (DisplayControl.DisplayPage == DSO_PAGE_SETTINGS) {
                             // refresh buttons
                             drawDSOSettingsPage();
-                        } else if (DisplayControl.DisplayPage == DISPLAY_PAGE_FREQUENCY) {
+                        } else if (DisplayControl.DisplayPage == DSO_PAGE_FREQUENCY) {
                             // refresh buttons
                             drawFrequencyGeneratorPage();
 #if !defined(AVR)
-                        } else if (DisplayControl.DisplayPage == DISPLAY_PAGE_MORE_SETTINGS) {
+                        } else if (DisplayControl.DisplayPage == DSO_PAGE_MORE_SETTINGS) {
                             // refresh buttons
                             drawDSOMoreSettingsPage();
 #endif
@@ -614,7 +601,7 @@ void __attribute__((noreturn)) loop(void) {
                          */
                         MeasurementControl.StopRequested = false;
                         MeasurementControl.isRunning = false;
-                        if (MeasurementControl.ADCReference != DEFAULT) {
+                        if (MeasurementControl.ADCReferenceShifted != (DEFAULT << REFS0)) {
                             // get new VCC Value
                             setVCCValue();
                         }
@@ -635,7 +622,7 @@ void __attribute__((noreturn)) loop(void) {
                         // handle trigger line
                         DisplayControl.TriggerLevelDisplayValue = getDisplayFromRawInputValue(MeasurementControl.RawTriggerLevel);
                         if (tLastTriggerDisplayValue
-                                != DisplayControl.TriggerLevelDisplayValue&& DisplayControl.DisplayPage == DISPLAY_PAGE_CHART) {
+                                != DisplayControl.TriggerLevelDisplayValue&& DisplayControl.DisplayPage == DSO_PAGE_CHART) {
                             clearTriggerLine(tLastTriggerDisplayValue);
                             drawTriggerLine();
                         }
@@ -713,7 +700,7 @@ void __attribute__((noreturn)) loop(void) {
                 /*
                  * Analyze mode here
                  */
-                if (sDoInfoOutput && DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS) {
+                if (sDoInfoOutput && DisplayControl.DisplayPage == DSO_PAGE_SETTINGS) {
                     sDoInfoOutput = false;
                     /*
                      * show VCC and Temp and stack
@@ -726,17 +713,17 @@ void __attribute__((noreturn)) loop(void) {
             /*
              * Handle Sub-Pages
              */
-            if (DisplayControl.DisplayPage == DISPLAY_PAGE_SETTINGS) {
+            if (DisplayControl.DisplayPage == DSO_PAGE_SETTINGS) {
                 if (sBackButtonPressed) {
                     sBackButtonPressed = false;
-                    DisplayControl.DisplayPage = DISPLAY_PAGE_CHART;
+                    DisplayControl.DisplayPage = DSO_PAGE_CHART;
                     redrawDisplay();
                 }
-            } else if (DisplayControl.DisplayPage == DISPLAY_PAGE_FREQUENCY) {
+            } else if (DisplayControl.DisplayPage == DSO_PAGE_FREQUENCY) {
                 if (sBackButtonPressed) {
                     sBackButtonPressed = false;
                     stopFrequencyGeneratorPage();
-                    DisplayControl.DisplayPage = DISPLAY_PAGE_SETTINGS;
+                    DisplayControl.DisplayPage = DSO_PAGE_SETTINGS;
                     redrawDisplay();
                 } else {
                     //not required here, because is contains only checkAndHandleEvents()
@@ -758,8 +745,9 @@ void __attribute__((noreturn)) loop(void) {
  * sets ADC status register including prescaler
  */
 void startAcquisition(void) {
-    DataBufferControl.AcquisitionSize = REMOTE_DISPLAY_WIDTH;
-    DataBufferControl.DataBufferEndPointer = &DataBufferControl.DataBuffer[REMOTE_DISPLAY_WIDTH - 1];
+    ADMUX = MeasurementControl.ADMUXChannel | MeasurementControl.ADCReferenceShifted; // it may be overwritten by getVoltage()
+    DataBufferControl.AcquisitionSize = DISPLAY_WIDTH;
+    DataBufferControl.DataBufferEndPointer = &DataBufferControl.DataBuffer[DISPLAY_WIDTH - 1];
     if (MeasurementControl.StopRequested) {
         DataBufferControl.AcquisitionSize = DATABUFFER_SIZE;
         DataBufferControl.DataBufferEndPointer = &DataBufferControl.DataBuffer[DATABUFFER_SIZE - 1];
@@ -990,14 +978,14 @@ void acquireDataFast(void) {
          * 10-50us range. Data is stored directly as 16 bit value and not processed.
          * => we have only half number of samples (tLoopCount)
          */
-        if (DATABUFFER_SIZE < REMOTE_DISPLAY_WIDTH * 2) {
+        if (DATABUFFER_SIZE < DISPLAY_WIDTH * 2) {
             // In this configuration (for testing etc.) we have not enough space
-            // for DISPLAY_WIDTH 16 bit-values which need (REMOTE_DISPLAY_WIDTH * 2) bytes.
+            // for DISPLAY_WIDTH 16 bit-values which need (DISPLAY_WIDTH * 2) bytes.
             // The compiler will remove the code if the configuration does not hold ;-)
             tLoopCount = DATABUFFER_SIZE / 2;
-        } else if (tLoopCount > REMOTE_DISPLAY_WIDTH) {
+        } else if (tLoopCount > DISPLAY_WIDTH) {
             // Last measurement before stop, fill the whole buffer with 16 bit values
-            // During running measurements we know here (see if above) that we can get REMOTE_DISPLAY_WIDTH 16 bit values
+            // During running measurements we know here (see if above) that we can get DISPLAY_WIDTH 16 bit values
             tLoopCount = tLoopCount / 2;
         }
         *DataPointerFast++ = tUValue.byte.LowByte;
@@ -1092,7 +1080,7 @@ void acquireDataFast(void) {
     ADCSRA &= ~_BV(ADATE); // Disable auto-triggering
     MeasurementControl.RawValueMax = tValueMax;
     MeasurementControl.RawValueMin = tValueMin;
-    if (tIndex <= TIMEBASE_INDEX_ULTRAFAST_MODES && tLoopCount > REMOTE_DISPLAY_WIDTH) {
+    if (tIndex <= TIMEBASE_INDEX_ULTRAFAST_MODES && tLoopCount > DISPLAY_WIDTH) {
         // compensate for half sample count in last measurement in ultra fast mode
         tIntegrateValue *= 2;
         // set remaining of buffer to zero
@@ -1400,14 +1388,14 @@ void setInputRange(uint8_t aShiftValue, uint8_t aActiveAttenuatorValue) {
     }
     resetOffset();
 
-    if (MeasurementControl.isRunning && DisplayControl.DisplayPage == DISPLAY_PAGE_CHART) {
+    if (MeasurementControl.isRunning && DisplayControl.DisplayPage == DSO_PAGE_CHART) {
         //clear old grid, since it will be changed
         BlueDisplay1.clearDisplay();
     }
     float tNewGridVoltage;
     uint16_t tHorizontalGridSizeShift8;
 
-    if (MeasurementControl.ADCReference == DEFAULT) {
+    if (MeasurementControl.ADCReferenceShifted == (DEFAULT << REFS0)) {
         /*
          * 5 volt reference
          */
@@ -1526,16 +1514,16 @@ void computeAutoRange(void) {
 // ignore warnings since we know that now tPeakToPeak is positive
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-compare"
-    if (tPeakToPeak >= REMOTE_DISPLAY_HEIGHT * 2) {
+    if (tPeakToPeak >= DISPLAY_HEIGHT * 2) {
         tNewValueShift = 2;
-    } else if (tPeakToPeak >= REMOTE_DISPLAY_HEIGHT) {
+    } else if (tPeakToPeak >= DISPLAY_HEIGHT) {
 #pragma GCC diagnostic pop
         tNewValueShift = 1;
     } else if (MeasurementControl.AttenuatorValue > 0 && MeasurementControl.AttenuatorType >= ATTENUATOR_TYPE_ACTIVE_ATTENUATOR) {
         /*
          * only max value is relevant for attenuator switching!
          */
-        if (MeasurementControl.RawValueMax < ((REMOTE_DISPLAY_HEIGHT - (REMOTE_DISPLAY_HEIGHT / 10)) * 4) / ATTENUATOR_FACTOR) {
+        if (MeasurementControl.RawValueMax < ((DISPLAY_HEIGHT - (DISPLAY_HEIGHT / 10)) * 4) / ATTENUATOR_FACTOR) {
             // more than 10 percent below theoretical threshold -> switch attenuator to higher resolution
             tNewAttenuatorValue--;
             tNewValueShift = 2;
@@ -1638,7 +1626,7 @@ uint16_t getAttenuatorFactor(void) {
 /*
  * toggle between DC and AC mode
  */
-void doAcDcMode(__attribute__((unused))      BDButton *aTheTouchedButton, __attribute__((unused))      int16_t aValue) {
+void doAcDcMode(BDButton *aTheTouchedButton __attribute__((unused)), int16_t aValue __attribute__((unused))) {
     setACMode(!MeasurementControl.ChannelIsACMode);
 }
 
@@ -1672,14 +1660,14 @@ void doSetTriggerDelay(float aValue) {
 /*
  * toggle between 5 and 1.1 volt reference
  */
-void doADCReference(__attribute__((unused))      BDButton *aTheTouchedButton, __attribute__((unused))      int16_t aValue) {
-    uint8_t tNewReference = MeasurementControl.ADCReference;
-    if (MeasurementControl.ADCReference == DEFAULT) {
-        tNewReference = INTERNAL;
+void doADCReference(BDButton *aTheTouchedButton __attribute__((unused)), int16_t aValue __attribute__((unused))) {
+    uint8_t tNewReferenceShifted = MeasurementControl.ADCReferenceShifted;
+    if (MeasurementControl.ADCReferenceShifted == (DEFAULT << REFS0)) {
+        tNewReferenceShifted = (INTERNAL << REFS0);
     } else {
-        tNewReference = DEFAULT;
+        tNewReferenceShifted = (DEFAULT << REFS0);
     }
-    setADCReference(tNewReference); // switch hardware
+    setADCReferenceShifted(tNewReferenceShifted);
     setReferenceButtonCaption();
     if (!MeasurementControl.RangeAutomatic) {
         // set new grid values
@@ -1687,7 +1675,7 @@ void doADCReference(__attribute__((unused))      BDButton *aTheTouchedButton, __
     }
 }
 
-void doStartStopDSO(__attribute__((unused))      BDButton *aTheTouchedButton, __attribute__((unused))      int16_t aValue) {
+void doStartStopDSO(BDButton *aTheTouchedButton __attribute__((unused)), int16_t aValue __attribute__((unused))) {
     if (MeasurementControl.isRunning) {
         /*
          * Stop here
@@ -1731,7 +1719,7 @@ void doStartStopDSO(__attribute__((unused))      BDButton *aTheTouchedButton, __
          * Start here
          */
         BlueDisplay1.clearDisplay();
-        DisplayControl.DisplayPage = DISPLAY_PAGE_CHART;
+        DisplayControl.DisplayPage = DSO_PAGE_CHART;
         //DisplayControl.showInfoMode = true;
         activateChartGui();
         drawGridLinesWithHorizLabelsAndTriggerLine();
@@ -1745,10 +1733,10 @@ void doStartStopDSO(__attribute__((unused))      BDButton *aTheTouchedButton, __
  * Graphical output section
  ************************************************************************/
 /*
- * returns false if display was scrolled
+ * returns false if display was successfully scrolled, true on error
  */
-uint8_t scrollChart(int aScrollAmount) {
-    if (DisplayControl.DisplayPage != DISPLAY_PAGE_CHART) {
+bool scrollChart(int aScrollAmount) {
+    if (DisplayControl.DisplayPage != DSO_PAGE_CHART) {
         return true;
     }
     bool isError = false;
@@ -1766,7 +1754,7 @@ uint8_t scrollChart(int aScrollAmount) {
             // Only half of data buffer is filled
             tMaxAddress = &DataBufferControl.DataBuffer[DATABUFFER_SIZE / 2];
         }
-        tMaxAddress = tMaxAddress - (REMOTE_DISPLAY_WIDTH / DisplayControl.XScale);
+        tMaxAddress = tMaxAddress - (DISPLAY_WIDTH / DisplayControl.XScale);
         if (DataBufferControl.DataBufferDisplayStart > tMaxAddress) {
             DataBufferControl.DataBufferDisplayStart = tMaxAddress;
             isError = true;
@@ -1817,11 +1805,11 @@ void drawRemainingDataBufferValues(void) {
     uint16_t tBufferIndex = DataBufferControl.DataBufferNextDrawIndex;
 
     while (DataBufferControl.DataBufferNextDrawPointer < DataBufferControl.DataBufferNextInPointer
-            && tBufferIndex < REMOTE_DISPLAY_WIDTH) {
+            && tBufferIndex < DISPLAY_WIDTH) {
         /*
          * clear old line
          */
-        if (tBufferIndex < REMOTE_DISPLAY_WIDTH - 1) {
+        if (tBufferIndex < DISPLAY_WIDTH - 1) {
             // fetch next value and clear line in advance
             tValueByte = DataBufferControl.DisplayBuffer[tBufferIndex];
             tNextValueByte = DataBufferControl.DisplayBuffer[tBufferIndex + 1];
@@ -1834,7 +1822,7 @@ void drawRemainingDataBufferValues(void) {
         tValueByte = *DataBufferControl.DataBufferNextDrawPointer++;
         DataBufferControl.DisplayBuffer[tBufferIndex] = tValueByte;
 
-        if (tBufferIndex != 0 && tBufferIndex <= REMOTE_DISPLAY_WIDTH - 1) {
+        if (tBufferIndex != 0 && tBufferIndex <= DISPLAY_WIDTH - 1) {
             // get last value and draw line
             tLastValueByte = DataBufferControl.DisplayBuffer[tBufferIndex - 1];
             BlueDisplay1.drawLineFastOneX(tBufferIndex - 1, tLastValueByte, tValueByte, COLOR_DATA_RUN);
@@ -1944,7 +1932,7 @@ void printInfo(bool aRecomputeValues) {
     } else {
         tRefMultiplier = 1;
     }
-    if (MeasurementControl.ADCReference == DEFAULT) {
+    if (MeasurementControl.ADCReferenceShifted == (DEFAULT << REFS0)) {
         tReferenceChar = '5';
         tRefMultiplier *= MeasurementControl.VCC / 1024.0;
         /*
@@ -1995,10 +1983,10 @@ void printInfo(bool aRecomputeValues) {
         /*
          * Long version 1. line Timebase, Channel, (min, average, max, peak to peak) voltage, Trigger, Reference.
          */
-        sprintf_P(sStringBuffer, PSTR("%3u%cs %c      %s %s %s P2P%sV %sV %c"), tTimebaseUnitsPerGrid, tTimebaseUnitChar,
+        sprintf_P(sStringBuffer, PSTR("%3u%cs %c      %s %s %s P2P%sV %sV %cV"), tTimebaseUnitsPerGrid, tTimebaseUnitChar,
                 tSlopeChar, tMinStringBuffer, tAverageStringBuffer, tMaxStringBuffer, tP2PStringBuffer, tTriggerStringBuffer,
                 tReferenceChar);
-        memcpy_P(&sStringBuffer[8], ADCInputMUXChannelStrings[MeasurementControl.ADCInputMUXChannelIndex], 4);
+        memcpy_P(&sStringBuffer[8], ADCInputMUXChannelStrings[MeasurementControl.ADMUXChannel], 4);
         BlueDisplay1.drawText(INFO_LEFT_MARGIN, FONT_SIZE_INFO_LONG_ASC, sStringBuffer, FONT_SIZE_INFO_LONG, COLOR16_BLACK,
         COLOR_INFO_BACKGROUND);
 
@@ -2033,7 +2021,7 @@ void printInfo(bool aRecomputeValues) {
         /*
          * Short version
          */
-#if defined(LOCAL_DISPLAY_EXISTS)
+#if defined(SUPPORT_LOCAL_DISPLAY)
         snprintf(sStringBuffer, sizeof sStringBuffer, "%6.*fV %6.*fV%s%4u%cs", tPrecision,
                 getFloatFromRawValue(MeasurementControl.RawValueAverage), tPrecision, getFloatFromRawValue(tValueDiff),
                 tBufferForPeriodAndFrequency, tUnitsPerGrid, tTimebaseUnitChar);
@@ -2071,7 +2059,7 @@ void printTriggerInfo(void) {
     } else {
         tRefMultiplier = 1;
     }
-    if (MeasurementControl.ADCReference == DEFAULT) {
+    if (MeasurementControl.ADCReferenceShifted == (DEFAULT << REFS0)) {
         tRefMultiplier *= MeasurementControl.VCC / 1024.0;
         /*
          * Use 1023 to get 5 volt display for full scale reading
@@ -2308,7 +2296,7 @@ float getFloatFromDisplayValue(uint8_t aDisplayValue) {
     } else {
         tFactor = 1;
     }
-    if (MeasurementControl.ADCReference == DEFAULT) {
+    if (MeasurementControl.ADCReferenceShifted == (DEFAULT << REFS0)) {
         tFactor *= MeasurementControl.VCC / 1024.0;
     } else {
         tFactor *= 1.1 / 1024.0;
@@ -2336,7 +2324,7 @@ void setVCCValue(void) {
  * ShiftValue
  * ADCInputMUXChannel
  * ADCInputMUXChannelChar
- * ADCReference
+ * ADCReferenceShifted
  * tHasACDC
  * isACMode
  *
@@ -2354,7 +2342,6 @@ void setVCCValue(void) {
  * ChannelHasAttenuator
  *  */
 void setChannel(uint8_t aChannel) {
-    MeasurementControl.ADCInputMUXChannelIndex = aChannel;
     /*
      * Set default values for plain inputs without attenuator but potential AC/DC capabilities
      */
@@ -2362,7 +2349,7 @@ void setChannel(uint8_t aChannel) {
     bool tIsACMode = false;
     MeasurementControl.AttenuatorValue = 0; // no attenuator attached at channel
     uint8_t tHasAC_DC = true;
-    uint8_t tReference = DEFAULT; // DEFAULT/1 -> VCC   INTERNAL/3 -> 1.1 volt
+    uint8_t tReferenceShifted = (DEFAULT << REFS0); // DEFAULT/1 -> VCC   INTERNAL/3 -> 1.1 volt
 
     if (MeasurementControl.AttenuatorType >= ATTENUATOR_TYPE_ACTIVE_ATTENUATOR) {
         if (aChannel < NUMBER_OF_CHANNEL_WITH_ACTIVE_ATTENUATOR) {
@@ -2370,7 +2357,7 @@ void setChannel(uint8_t aChannel) {
             // restore AC mode for this channels
             tIsACMode = MeasurementControl.isACMode;
             // use internal reference if attenuator is available
-            tReference = INTERNAL;
+            tReferenceShifted = (INTERNAL << REFS0);
         } else {
             tHasAC_DC = false;
             MeasurementControl.ChannelHasActiveAttenuator = false;
@@ -2382,12 +2369,12 @@ void setChannel(uint8_t aChannel) {
             MeasurementControl.AttenuatorValue = aChannel; // channel 0 has 10^0 attenuation factor etc.
             // restore AC mode for this channels
             tIsACMode = MeasurementControl.isACMode;
-            tReference = INTERNAL;
+            tReferenceShifted = (INTERNAL << REFS0);
         }
     }
 
     /*
-     * Map channel index to special channel numbers
+     * Map some channel indexes to special channel numbers
      */
     if (aChannel == MAX_ADC_EXTERNAL_CHANNEL + 1) {
         aChannel = ADC_TEMPERATURE_CHANNEL; // Temperature
@@ -2397,11 +2384,12 @@ void setChannel(uint8_t aChannel) {
         aChannel = ADC_1_1_VOLT_CHANNEL; // 1.1 Reference
         tHasAC_DC = false;
     }
-    ADMUX = aChannel | (tReference << REFS0);
 
+    ADMUX = aChannel | tReferenceShifted;
+    MeasurementControl.ADMUXChannel = aChannel;
+    MeasurementControl.ADCReferenceShifted = tReferenceShifted;
     MeasurementControl.ChannelIsACMode = tIsACMode;
     MeasurementControl.ChannelHasAC_DCSwitch = tHasAC_DC;
-    MeasurementControl.ADCReference = tReference;
 
 //the second parameter for active attenuator is only required if ChannelHasActiveAttenuator == true
     setInputRange(2, 2);
@@ -2412,9 +2400,9 @@ inline void setPrescaleFactor(uint8_t aFactor) {
 }
 
 // DEFAULT/1 -> VCC   INTERNAL/3 -> 1.1  volt
-void setADCReference(uint8_t aReference) {
-    MeasurementControl.ADCReference = aReference;
-    ADMUX = (ADMUX & ~0xC0) | (aReference << REFS0);
+void setADCReferenceShifted(uint8_t aReferenceShifted) {
+    MeasurementControl.ADCReferenceShifted = aReferenceShifted;
+    ADMUX = (ADMUX & ~0xC0) | aReferenceShifted;
 }
 
 void setTimer2FastPWMOutput() {
