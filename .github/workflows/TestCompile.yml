@@ -16,16 +16,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@master
 
-      - name: Checkout new BlueDisplay library
-        uses: actions/checkout@v3
-        with:
-          repository: ArminJo/Arduino-BlueDisplay
-          ref: master
-          path: CustomLibrary_BD # must contain string "Custom"
-          # Must remove BlueDisplay from REQUIRED_LIBRARIES
+#      - name: Checkout new BlueDisplay library
+#        uses: actions/checkout@master
+#        with:
+#          repository: ArminJo/Arduino-BlueDisplay
+#          ref: master
+#          path: CustomLibrary_BD # must contain string "Custom"
+#          # Must remove BlueDisplay from REQUIRED_LIBRARIES
 
       - name: Compile all examples
         uses: ArminJo/arduino-test-compile@master
         with:
           sketch-names: SimpleDSO.ino
-#          required-libraries: BlueDisplay
+          required-libraries: BlueDisplay
