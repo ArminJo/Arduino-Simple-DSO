@@ -9,7 +9,7 @@ This DSO needs only a standard Arduino-Uno or Arduino-Nano, a HC-05 Bluetooth mo
  &nbsp; &nbsp;
 [![Badge Commits since latest](https://img.shields.io/github/commits-since/ArminJo/Arduino-Simple-DSO/latest?color=yellow)](https://github.com/ArminJo/Arduino-Simple-DSO/commits/master)
  &nbsp; &nbsp;
-[![Badge Build Status](https://github.com/ArminJo/Arduino-Simple-DSO/workflows/LibraryBuild/badge.svg)](https://github.com/ArminJo/Arduino-Simple-DSO/actions)
+[![Badge Build Status](https://github.com/ArminJo/Arduino-Simple-DSO/workflows/TestCompile/badge.svg)](https://github.com/ArminJo/Arduino-Simple-DSO/actions)
  &nbsp; &nbsp;
 ![Badge Hit Counter](https://visitor-badge.laobi.icu/badge?page_id=ArminJo_Arduino-Simple-DSO)
 <br/>
@@ -62,7 +62,7 @@ You can load the library with *Tools -> Manage Libraries...* or *Ctrl+Shift+I*. 
 
 Optional for Bluetooth connection
 6. HC-05 Bluetooth module
-7. Shottky diode e.g. BAT42
+7. Schottky diode e.g. BAT42
 
 # INSTRUCTIONS FOR USE
 The DSO software has 4 pages.
